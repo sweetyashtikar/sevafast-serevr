@@ -24,8 +24,12 @@ const userSchema = new mongoose.Schema({
         default : "Active"
     },
     otpPin: {
-        type: String
-    }
+        type: String,
+        select: false
+    },
+    otpExpire: {
+        type: Date
+    },
 }, { 
     timestamps: true 
 });
