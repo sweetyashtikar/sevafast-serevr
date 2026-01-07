@@ -1,0 +1,711 @@
+# 📦 Product Management API Documentation
+
+## Base URL
+```
+http://localhost:5000/api/products
+```
+
+---
+
+## 🔐 Authentication
+
+Most vendor routes require authentication. Include the JWT token in the header:
+
+```
+Authorization: Bearer <your_jwt_token>
+```
+
+---
+
+## 📚 API Endpoints Overview
+
+| Method | Endpoint | Access | Description |
+|--------|----------|--------|-------------|
+| POST | `/` | Vendor | Add new product |
+| PUT | `/:productId` | Vendor | Update product |
+| DELETE | `/:productId` | Vendor | Delete product |
+| GET | `/:productId` | Public | Get single product |
+| GET | `/` | Public | Get all products |
+| GET | `/vendor/my-products` | Vendor | Get vendor's products |
+| GET | `/category/:categoryId` | Public | Get products by category |
+| GET | `/search/all` | Public | Search products |
+| GET | `/featured/all` | Public | Get featured products |
+| GET | `/related/:productId` | Public | Get related products |
+| PATCH | `/:productId/status` | Vendor | Update product status |
+| PATCH | `/:productId/stock` | Vendor | Update product stock |
+| GET | `/check-delivery/:productId` | Public | Check delivery availability |
+
+---
+
+## 1️⃣ ADD PRODUCT
+
+### **POST** `/api/products`
+
+**Access:** Private (Vendor only)
+
+**Headers:**
+```
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+---
+
+### **Example 1: Add Simple Product**
+
+```json
+{
+  "pro_input_name": "Premium Cotton T-Shirt",
+  "short_description": "Comfortable cotton t-shirt for daily wear",
+  "pro_input_description": "Made from 100% premium cotton. Soft, breathable and durable.",
+  "extra_input_description": "Machine washable. Available in multiple colors.",
+  
+  "category_id": "65a1b2c3d4e5f6789012345",
+  "tags": "tshirt,cotton,clothing,casual",
+  "brand": "Nike",
+  "hsn_code": "610910",
+  "made_in": "India",
+  "indicator": 0,
+  
+  "pro_input_tax": "65b1c2d3e4f5a6789012345",
+  "is_prices_inclusive_tax": 0,
+  
+  "total_allowed_quantity": 100,
+  "minimum_order_quantity": 1,
+  "quantity_step_size": 1,
+  
+  "product_type": "simple_product",
+  
+  "deliverable_type": 1,
+  "pickup_location": "Mumbai Warehouse",
+  
+  "cod_allowed": 1,
+  "is_returnable": 1,
+  "is_cancelable": 1,
+  "cancelable_till": "processed",
+  "warranty_period": "6 months",
+  
+  "pro_input_image": "/uploads/tshirt-main.jpg",
+  "other_images": [
+    "/uploads/tshirt-front.jpg",
+    "/uploads/tshirt-back.jpg"
+  ],
+  
+  "simple_price": 599,
+  "simple_special_price": 499,
+  "simple_product_stock_status": 1,
+  "product_sku": "TSH-NKE-001",
+  "product_total_stock": 50,
+  "weight": 0.2,
+  "height": 30,
+  "breadth": 25,
+  "length": 2,
+  
+  "status": 1
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Product added successfully",
+  "data": {
+    "product": {
+      "_id": "65c1d2e3f4a5b6789012345",
+      "vendorId": "65a1b2c3d4e5f6789012345",
+      "name": "Premium Cotton T-Shirt",
+      "slug": "premium-cotton-t-shirt-lx4k9m",
+      "productType": "simple_product",
+      "simpleProduct": {
+        "price": 599,
+        "specialPrice": 499,
+        "sku": "TSH-NKE-001",
+        "totalStock": 50,
+        "stockStatus": 1
+      },
+      "isActive": true,
+      "createdAt": "2024-01-06T10:30:00.000Z"
+    }
+  }
+}
+```
+
+---
+
+### **Example 2: Add Variable Product**
+
+```json
+{
+  "pro_input_name": "Men's Casual Shirt",
+  "short_description": "Stylish casual shirt available in multiple sizes",
+  "pro_input_description": "Premium quality casual shirt perfect for any occasion",
+  
+  "category_id": "65a1b2c3d4e5f6789012345",
+  "tags": "shirt,casual,mens,formal",
+  "brand": "Peter England",
+  "indicator": 0,
+  
+  "pro_input_tax": "65b1c2d3e4f5a6789012345",
+  "is_prices_inclusive_tax": 0,
+  
+  "total_allowed_quantity": 200,
+  "minimum_order_quantity": 1,
+  "quantity_step_size": 1,
+  
+  "product_type": "variable_product",
+  "variant_stock_level_type": "variable_level",
+  
+  "attribute_values": "1,2,3,4,5",
+  
+  "deliverable_type": 1,
+  "cod_allowed": 1,
+  "is_returnable": 1,
+  "is_cancelable": 1,
+  
+  "pro_input_image": "/uploads/shirt-main.jpg",
+  "other_images": ["/uploads/shirt-1.jpg", "/uploads/shirt-2.jpg"],
+  
+  "variants_ids": "1 3,1 4,2 3,2 4",
+  "variant_price": "799,799,899,899",
+  "variant_special_price": "699,699,799,799",
+  "variant_sku": "SHT-S-BLU,SHT-S-RED,SHT-M-BLU,SHT-M-RED",
+  "variant_total_stock": "20,15,25,18",
+  "variant_level_stock_status": "1,1,1,1",
+  "weight": "0.3,0.3,0.35,0.35",
+  "height": "40,40,42,42",
+  
+  "status": 1
+}
+```
+
+**Variant IDs Explanation:**
+- `"1 3"` = Size: Small (id=1) + Color: Blue (id=3)
+- `"1 4"` = Size: Small (id=1) + Color: Red (id=4)
+- `"2 3"` = Size: Medium (id=2) + Color: Blue (id=3)
+- `"2 4"` = Size: Medium (id=2) + Color: Red (id=4)
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Product added successfully",
+  "data": {
+    "product": {
+      "_id": "65c1d2e3f4a5b6789012346",
+      "name": "Men's Casual Shirt",
+      "productType": "variable_product",
+      "variantStockLevelType": "variable_level",
+      "variants": [
+        {
+          "variantIds": "1 3",
+          "price": 799,
+          "specialPrice": 699,
+          "sku": "SHT-S-BLU",
+          "totalStock": 20,
+          "stockStatus": 1
+        },
+        // ... more variants
+      ]
+    }
+  }
+}
+```
+
+---
+
+### **Example 3: Add Digital Product**
+
+```json
+{
+  "pro_input_name": "Complete JavaScript Course - eBook",
+  "short_description": "Learn JavaScript from basics to advanced",
+  "pro_input_description": "Comprehensive guide covering all aspects of JavaScript",
+  
+  "category_id": "65a1b2c3d4e5f6789012345",
+  "tags": "ebook,javascript,programming,tutorial",
+  "brand": "TechBooks",
+  "indicator": 0,
+  
+  "product_type": "digital_product",
+  
+  "deliverable_type": 0,
+  "cod_allowed": 0,
+  "is_returnable": 0,
+  "is_cancelable": 0,
+  
+  "pro_input_image": "/uploads/ebook-cover.jpg",
+  
+  "download_allowed": 1,
+  "download_link_type": "self_hosted",
+  "pro_input_zip": "/uploads/javascript-course.pdf",
+  
+  "simple_price": 999,
+  "simple_special_price": 499,
+  
+  "status": 1
+}
+```
+
+---
+
+## 2️⃣ UPDATE PRODUCT
+
+### **PUT** `/api/products/:productId`
+
+**Access:** Private (Vendor only - own products)
+
+```json
+{
+  "pro_input_name": "Premium Cotton T-Shirt - Updated",
+  "short_description": "New updated description",
+  "simple_price": 649,
+  "simple_special_price": 549,
+  "product_total_stock": 75,
+  "status": 1
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Product updated successfully",
+  "data": {
+    "product": { /* updated product */ }
+  }
+}
+```
+
+---
+
+## 3️⃣ DELETE PRODUCT
+
+### **DELETE** `/api/products/:productId`
+
+**Access:** Private (Vendor only - own products)
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Product deleted successfully"
+}
+```
+
+---
+
+## 4️⃣ GET SINGLE PRODUCT
+
+### **GET** `/api/products/:productId`
+
+**Access:** Public
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "product": {
+      "_id": "65c1d2e3f4a5b6789012345",
+      "name": "Premium Cotton T-Shirt",
+      "slug": "premium-cotton-t-shirt-lx4k9m",
+      "shortDescription": "Comfortable cotton t-shirt",
+      "description": "Made from 100% premium cotton...",
+      "categoryId": {
+        "_id": "65a1b2c3d4e5f6789012345",
+        "name": "Clothing"
+      },
+      "vendorId": {
+        "_id": "65a1b2c3d4e5f6789012345",
+        "fullName": "John's Store",
+        "businessName": "John Fashion"
+      },
+      "brand": "Nike",
+      "tags": ["tshirt", "cotton", "clothing", "casual"],
+      "indicator": 0,
+      "productType": "simple_product",
+      "simpleProduct": {
+        "price": 599,
+        "specialPrice": 499,
+        "sku": "TSH-NKE-001",
+        "totalStock": 50,
+        "stockStatus": 1
+      },
+      "mainImage": "/uploads/tshirt-main.jpg",
+      "otherImages": ["/uploads/tshirt-front.jpg"],
+      "codAllowed": true,
+      "isReturnable": true,
+      "isCancelable": true,
+      "views": 125,
+      "totalSales": 45,
+      "rating": {
+        "average": 4.5,
+        "count": 23
+      },
+      "effectivePrice": 499,
+      "discountPercentage": 17,
+      "inStock": true,
+      "createdAt": "2024-01-06T10:30:00.000Z"
+    }
+  }
+}
+```
+
+---
+
+## 5️⃣ GET ALL PRODUCTS
+
+### **GET** `/api/products`
+
+**Access:** Public
+
+**Query Parameters:**
+- `page` - Page number (default: 1)
+- `limit` - Items per page (default: 20, max: 100)
+- `category` - Filter by category ID
+- `vendor` - Filter by vendor ID
+- `search` - Search text
+- `minPrice` - Minimum price
+- `maxPrice` - Maximum price
+- `brand` - Filter by brand
+- `indicator` - Filter by indicator (0=None, 1=Veg, 2=Non-Veg)
+- `productType` - Filter by type (simple_product, variable_product, digital_product)
+- `sortBy` - Sort field (createdAt, name, price, totalSales, rating.average, views)
+- `sortOrder` - Sort order (asc, desc)
+- `inStock` - Filter in-stock products (true, false)
+
+**Example Request:**
+```
+GET /api/products?page=1&limit=20&category=65a1b2c3d4e5f6789012345&minPrice=100&maxPrice=1000&brand=Nike&sortBy=price&sortOrder=asc&inStock=true
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "products": [
+      { /* product 1 */ },
+      { /* product 2 */ },
+      // ... more products
+    ],
+    "pagination": {
+      "currentPage": 1,
+      "totalPages": 5,
+      "totalProducts": 98,
+      "productsPerPage": 20
+    }
+  }
+}
+```
+
+---
+
+## 6️⃣ GET VENDOR PRODUCTS
+
+### **GET** `/api/products/vendor/my-products`
+
+**Access:** Private (Vendor only)
+
+**Query Parameters:**
+- `page` - Page number
+- `limit` - Items per page
+- `status` - Filter by status (active, inactive)
+- `productType` - Filter by type
+- `sortBy` - Sort field
+- `sortOrder` - Sort order
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "products": [ /* vendor's products */ ],
+    "stats": {
+      "total": 45,
+      "active": 40,
+      "inactive": 3,
+      "pending": 2
+    },
+    "pagination": {
+      "currentPage": 1,
+      "totalPages": 3,
+      "totalProducts": 45,
+      "productsPerPage": 20
+    }
+  }
+}
+```
+
+---
+
+## 7️⃣ GET PRODUCTS BY CATEGORY
+
+### **GET** `/api/products/category/:categoryId`
+
+**Access:** Public
+
+**Example:**
+```
+GET /api/products/category/65a1b2c3d4e5f6789012345?page=1&limit=10&sortBy=totalSales&sortOrder=desc
+```
+
+---
+
+## 8️⃣ SEARCH PRODUCTS
+
+### **GET** `/api/products/search/all`
+
+**Access:** Public
+
+**Query Parameters:**
+- `query` - Search text (required, min 2 characters)
+- `page` - Page number
+- `limit` - Items per page
+
+**Example:**
+```
+GET /api/products/search/all?query=cotton%20tshirt&page=1&limit=10
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "products": [ /* matching products */ ],
+    "searchQuery": "cotton tshirt",
+    "pagination": {
+      "currentPage": 1,
+      "totalPages": 2,
+      "totalResults": 15
+    }
+  }
+}
+```
+
+---
+
+## 9️⃣ UPDATE PRODUCT STATUS
+
+### **PATCH** `/api/products/:productId/status`
+
+**Access:** Private (Vendor only)
+
+**Request Body:**
+```json
+{
+  "status": 1
+}
+```
+
+**Values:**
+- `0` = Inactive
+- `1` = Active
+
+---
+
+## 🔟 UPDATE PRODUCT STOCK
+
+### **PATCH** `/api/products/:productId/stock`
+
+**Access:** Private (Vendor only)
+
+**For Simple Product:**
+```json
+{
+  "stock": 100
+}
+```
+
+**For Variable Product (Product Level):**
+```json
+{
+  "stock": 200
+}
+```
+
+**For Variable Product (Variable Level):**
+```json
+{
+  "stock": 50,
+  "variantIds": "1 3"
+}
+```
+
+---
+
+## 1️⃣1️⃣ GET FEATURED PRODUCTS
+
+### **GET** `/api/products/featured/all`
+
+**Access:** Public
+
+**Query Parameters:**
+- `limit` - Number of products (default: 10)
+
+Returns products sorted by total sales and ratings.
+
+---
+
+## 1️⃣2️⃣ GET RELATED PRODUCTS
+
+### **GET** `/api/products/related/:productId`
+
+**Access:** Public
+
+**Query Parameters:**
+- `limit` - Number of products (default: 8)
+
+Returns products from the same category.
+
+---
+
+## 1️⃣3️⃣ CHECK DELIVERY AVAILABILITY
+
+### **GET** `/api/products/check-delivery/:productId`
+
+**Access:** Public
+
+**Query Parameters:**
+- `zipcode` - 6-digit zipcode (required)
+
+**Example:**
+```
+GET /api/products/check-delivery/65c1d2e3f4a5b6789012345?zipcode=560001
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "productId": "65c1d2e3f4a5b6789012345",
+    "zipcode": "560001",
+    "canDeliver": true,
+    "deliveryType": 1,
+    "codAllowed": true
+  }
+}
+```
+
+---
+
+## 🚨 Error Responses
+
+### Validation Error (400)
+```json
+{
+  "success": false,
+  "message": "Validation failed",
+  "errors": [
+    {
+      "field": "pro_input_name",
+      "message": "Product name is required"
+    }
+  ]
+}
+```
+
+### Not Found (404)
+```json
+{
+  "success": false,
+  "message": "Product not found"
+}
+```
+
+### Unauthorized (401)
+```json
+{
+  "success": false,
+  "message": "Access denied. No token provided."
+}
+```
+
+### Forbidden (403)
+```json
+{
+  "success": false,
+  "message": "You do not have permission to access this resource."
+}
+```
+
+### Server Error (500)
+```json
+{
+  "success": false,
+  "message": "Failed to add product",
+  "error": "Error details here"
+}
+```
+
+---
+
+## 📊 Product Type Matrix
+
+| Product Type | Price | Stock | Variants | Download |
+|--------------|-------|-------|----------|----------|
+| Simple | ✅ Required | ✅ Required | ❌ No | ❌ No |
+| Variable | ✅ Per Variant | ✅ Product/Variable Level | ✅ Required | ❌ No |
+| Digital | ✅ Required | ❌ N/A | ❌ No | ✅ Required |
+
+---
+
+## 🎯 Deliverable Type Guide
+
+| Value | Type | Description | Zipcodes Required |
+|-------|------|-------------|-------------------|
+| 0 | None | Not shippable (service/pickup only) | ❌ No |
+| 1 | All | Ships anywhere (default) | ❌ No |
+| 2 | Include | Only specific zipcodes | ✅ Yes |
+| 3 | Exclude | Everywhere except specific zipcodes | ✅ Yes |
+
+---
+
+## 🥗 Indicator Guide
+
+| Value | Type | Use Case |
+|-------|------|----------|
+| 0 | None | Electronics, clothing, etc. |
+| 1 | Veg | Vegetarian food items |
+| 2 | Non-Veg | Non-vegetarian food items |
+
+---
+
+## 💡 Tips & Best Practices
+
+1. **Always set main image** - Required for product listing
+2. **Use special prices** - Increases conversions
+3. **Add detailed descriptions** - Improves SEO
+4. **Set proper stock levels** - Prevents overselling
+5. **Enable COD wisely** - Based on your logistics
+6. **Use tags effectively** - Improves searchability
+7. **Set cancelable_till properly** - Based on your fulfillment speed
+8. **For variable products** - Ensure all variants have stock data
+9. **Digital products** - Always provide download link or file
+10. **Test delivery** - Use check-delivery endpoint before showing to customers
+
+---
+
+## 🔄 Workflow Example
+
+### Complete Product Lifecycle:
+
+```
+1. Vendor adds product → Status: Pending
+2. Admin approves → isApproved: true
+3. Vendor activates → isActive: true
+4. Product visible to customers → Gets orders
+5. Stock decreases → Auto update
+6. Low stock alert → Vendor restocks
+7. Out of stock → stockStatus: 0
+8. Vendor restocks → stockStatus: 1
+9. End of season → Vendor deactivates → isActive: false
+10. Next season → Vendor reactivates
+```
+
+---
+
+Would you like me to create testing examples with Postman collection or frontend integration code next?
