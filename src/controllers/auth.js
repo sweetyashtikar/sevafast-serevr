@@ -4,6 +4,8 @@ const bcrypt = require('bcryptjs');
 const {sendEmail,generateOTP} = require('../utils/sendmail');
 const User = require('../models/User');
 const { JWT_SECRET, JWT_EXPIRE } = require('../env-variables');
+const { resetToken ,decodeToken} = require('../utils/jwt');
+const {sanitizeUser} = require('../utils/sanitizer');
 
 const LoginUser = async (req, res) => {
     try {
@@ -28,14 +30,17 @@ const LoginUser = async (req, res) => {
         }
 
         // 3. Generate Token
-        const token = jwt.sign({ id: user._id }, JWT_SECRET, {
-            expiresIn: JWT_EXPIRE,
-        });
+        const token = jwt.sign({ id: user._id, username : user.username, email: user.email }, JWT_SECRET, {expiresIn: JWT_EXPIRE});
+
+         user.last_login = new Date();
+        await user.save({ validateBeforeSave: false });
+
+        const userresponse = sanitizeUser(user);
 
         res.status(200).json({
             success: true,
             token,
-            user 
+            userresponse
         });
     } catch (error) {
         console.log(error);
@@ -55,10 +60,13 @@ const ForgotPassword = async (req, res) => {
 
         const otpPin = generateOTP();
         console.log("Generated OTP:", otpPin);
-        const hashedotp = await bcrypt.hash(otpPin.toString(),10);
 
-        user.otpPin = hashedotp;
-        user.otpExpire = Date.now() + 10 * 60 * 1000;
+        if(!user.security){
+            user.security = {}
+        }
+
+        user.security.forgotten_password_code = otpPin.toString();
+        user.security.forgotten_password_time = Date.now() + 10 * 60 * 1000;
         
         await user.save({ validateBeforeSave: false });
 
@@ -85,13 +93,11 @@ const ForgotPassword = async (req, res) => {
 const VerifyOTP = async (req, res) => {
     try {
         const { email, otpPin } = req.body;
-        const user = await User.findOne({ email });
+        console.log(req.body)
+        const user = await User.findOne({ email }).select('+security.forgotten_password_code');
 
         if (!user) {
             return res.status(404).json({ success: false, message: "No user found with that email" });
-        }
-        if (user.otpExpire < Date.now()) {
-            return res.status(400).json({ success: false, message: "OTP has expired" });
         }
 
         // Ensure otpPin was sent in the request body
@@ -99,16 +105,22 @@ const VerifyOTP = async (req, res) => {
             return res.status(400).json({ success: false, message: "Please provide the OTP" });
         }
 
-        const isMatch = await bcrypt.compare(otpPin.toString(), user.otpPin);
+        const isMatch = await user.compareResetCode(otpPin);
+        console.log("Stored OTP Hash:", user.security.forgotten_password_code);
+        console.log("Entered OTP:", otpPin);
+        console.log("OTP Match Status:", isMatch);
+
         if (!isMatch) {
             return res.status(400).json({ success: false, message: "Invalid OTP" });
         }
 
-        user.otpPin = undefined;
-        user.otpExpire = undefined;
+        const resetToken = await resetToken(user._id, user.email, "reset");
+
+        user.security.forgotten_password_code = undefined;
+        user.security.forgotten_password_time = undefined;
         await user.save({ validateBeforeSave: false });
 
-        res.status(200).json({ success: true, message: "OTP verified successfully" });
+        res.status(200).json({ success: true, message: "OTP verified successfully", resetToken });
     } catch (error) {
         console.log(error);
         res.status(500).json({ success: false, message: error.message });
@@ -117,15 +129,23 @@ const VerifyOTP = async (req, res) => {
 
 const resetPassword = async (req, res) => {
     try {
-        const { email, newPassword } = req.body;
-        const user = await User.findOne({ email });
+        const { resetToken, newPassword } = req.body;
 
+          if (!resetToken) {
+            return res.status(400).json({ success: false, message: "Reset token is required" });
+        }
+
+        const decoded = await decodeToken(resetToken);
+        if (!decoded) {
+            return res.status(400).json({ success: false, message: "Invalid or expired reset token" });
+        }
+
+        const user = await User.findById(decoded.id).select('+password');
         if (!user) {
-            return res.status(404).json({ success: false, message: "No user found with that email" });
-        }   
+            return res.status(404).json({ success: false, message: "User not found" });
+        }
 
-        const newPasswordHash = await bcrypt.hash(newPassword, 10);
-        user.password = newPasswordHash;
+        user.password = newPassword;
         await user.save();
 
         res.status(200).json({ success: true, message: "Password reset successfully" });

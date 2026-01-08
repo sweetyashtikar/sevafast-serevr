@@ -6,7 +6,9 @@ const bcrypt = require('bcryptjs');
 // Create a new user
 const RegisterUser = async (req, res) => {    
     try {
-        const {  email, mobile, password , role } = req.body;
+        const {  username, email, mobile, password, role, 
+            latitude, longitude, address, city, pincode,
+            company, fcm_id } = req.body;
 
         // 2. Check that at least ONE contact method exists
         if (!email && !mobile) {
@@ -23,7 +25,32 @@ const RegisterUser = async (req, res) => {
         const findRole = await Roles.findOne({ role });
         if (!findRole) return res.status(400).json({ success: false ,message: 'Invalid role' });
 
-        const newUser = new User({email, mobile, password, role: findRole._id });
+        const userData = {
+            username: username || email.split('@')[0], // Fallback if username not provided
+            email,
+            mobile,
+            password,
+            role: findRole._id,
+            company,
+            fcm_id,
+            ip_address: req.ip || req.connection.remoteAddress,
+            // Mapping Nested Address Object
+            address_info: {
+                address,
+                city,
+                pincode
+            }
+        };
+
+        // 5. Handle Geo-Location (GeoJSON format)
+        if (latitude && longitude) {
+            userData.location = {
+                type: 'Point',
+                coordinates: [parseFloat(longitude), parseFloat(latitude)] // [long, lat]
+            };
+        }
+
+        const newUser = new User(userData);
         await newUser.save();
         res.status(201).json({
             success: true, 

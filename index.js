@@ -11,6 +11,7 @@ const authRoute = require('./src/routes/authRoute');
 const roleRoute = require('./src/routes/roleRoute');
 const categoryRoute = require('./src/routes/categoryRoute');
 const productRoute = require('./src/routes/productRoute');
+const cityRoutes = require('./src/routes/cityRoutes');
 
 
 
@@ -33,6 +34,7 @@ app.use('/api', authRoute);
 app.use('/api', roleRoute);
 app.use('/api', categoryRoute);
 app.use('/api', productRoute);
+app.use('/api', cityRoutes);
 
 
 

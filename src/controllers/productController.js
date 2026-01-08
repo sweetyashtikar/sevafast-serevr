@@ -561,35 +561,22 @@ exports.getAllProducts = async (req, res) => {
 exports.getVendorProducts = async (req, res) => {
   try {
     const vendorId = req.user._id;
-    const {
-      page = 1,
-      limit = 20,
-      status,
-      productType,
-      sortBy = 'createdAt',
-      sortOrder = 'desc'
-    } = req.query;
+    const { limit, offset, sort, searchQuery, filters } = req.paginationQuery;
 
     // Build query
     const query = {
+      ...searchQuery,
       vendorId,
       isDeleted: false
     };
 
-    if (status !== undefined) {
-      query.isActive = status === 'active';
+    if (filters.status !== undefined) {
+      query.isActive = filters.status === 'active';
     }
 
-    if (productType) {
-      query.productType = productType;
+    if (filters.productType) {
+      query.productType = filtersproductType;
     }
-
-    // Sorting
-    const sort = {};
-    sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
-
-    // Pagination
-    const skip = (parseInt(page) - 1) * parseInt(limit);
 
     // Execute query
     const products = await Product.find(query)
@@ -601,23 +588,23 @@ exports.getVendorProducts = async (req, res) => {
     const total = await Product.countDocuments(query);
 
     // Calculate stats
-    const stats = {
-      total: await Product.countDocuments({ vendorId, isDeleted: false }),
-      active: await Product.countDocuments({ vendorId, isActive: true, isDeleted: false }),
-      inactive: await Product.countDocuments({ vendorId, isActive: false, isDeleted: false }),
-      pending: await Product.countDocuments({ vendorId, isApproved: false, isDeleted: false })
-    };
+   const [totalItems, active, inactive, pending] = await Promise.all([
+      Product.countDocuments({ vendorId, isDeleted: false }),
+      Product.countDocuments({ vendorId, isActive: true, isDeleted: false }),
+      Product.countDocuments({ vendorId, isActive: false, isDeleted: false }),
+      Product.countDocuments({ vendorId, isApproved: false, isDeleted: false })
+    ]);
 
     res.status(200).json({
       success: true,
       data: {
         products,
-        stats,
-        pagination: {
-          currentPage: parseInt(page),
-          totalPages: Math.ceil(total / parseInt(limit)),
-          totalProducts: total,
-          productsPerPage: parseInt(limit)
+       stats: { total: totalItems, active, inactive, pending },
+       pagination: {
+          totalRecords: total,
+          limit,
+          offset,
+          totalPages: Math.ceil(total / limit)
         }
       }
     });

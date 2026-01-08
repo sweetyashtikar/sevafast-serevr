@@ -1,8 +1,12 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const productController = require('../controllers/productController');
-const { authenticate, authorizePermission, optionalAuth } = require('../middleware/authMiddleware');
-
+const productController = require("../controllers/productController");
+const {
+  authenticate,
+  authorizePermission,
+  optionalAuth,
+} = require("../middleware/authMiddleware");
+const { pagination } = require("../middleware/pagination");
 
 // ==========================================
 // PUBLIC ROUTES (No authentication required)
@@ -14,14 +18,14 @@ const { authenticate, authorizePermission, optionalAuth } = require('../middlewa
  * @access  Public
  * @query   page, limit, category, search, minPrice, maxPrice, brand, indicator, productType, sortBy, sortOrder, inStock
  */
-router.get('/', optionalAuth, productController.getAllProducts);
+router.get("/", productController.getAllProducts);
 
 /**
  * @route   GET /api/products/:productId
  * @desc    Get single product details
  * @access  Public
  */
-router.get('/:productId', productController.getProduct);
+router.get("/:productId", productController.getProduct);
 
 /**
  * @route   GET /api/products/category/:categoryId
@@ -29,7 +33,7 @@ router.get('/:productId', productController.getProduct);
  * @access  Public
  * @query   page, limit, sortBy, sortOrder
  */
-router.get('/category/:categoryId', productController.getProductsByCategory);
+router.get("/category/:categoryId", productController.getProductsByCategory);
 
 /**
  * @route   GET /api/products/search
@@ -37,7 +41,7 @@ router.get('/category/:categoryId', productController.getProductsByCategory);
  * @access  Public
  * @query   query, page, limit
  */
-router.get('/search/all', productController.searchProducts);
+router.get("/search/all", productController.searchProducts);
 
 /**
  * @route   GET /api/products/featured/all
@@ -45,7 +49,7 @@ router.get('/search/all', productController.searchProducts);
  * @access  Public
  * @query   limit
  */
-router.get('/featured/all', productController.getFeaturedProducts);
+router.get("/featured/all", productController.getFeaturedProducts);
 
 /**
  * @route   GET /api/products/related/:productId
@@ -53,7 +57,7 @@ router.get('/featured/all', productController.getFeaturedProducts);
  * @access  Public
  * @query   limit
  */
-router.get('/related/:productId', productController.getRelatedProducts);
+router.get("/related/:productId", productController.getRelatedProducts);
 
 /**
  * @route   GET /api/products/check-delivery/:productId
@@ -61,7 +65,7 @@ router.get('/related/:productId', productController.getRelatedProducts);
  * @access  Public
  * @query   zipcode
  */
-router.get('/check-delivery/:productId', productController.checkDelivery);
+router.get("/check-delivery/:productId", productController.checkDelivery);
 
 // ==========================================
 // VENDOR ROUTES (Authentication required)
@@ -72,9 +76,10 @@ router.get('/check-delivery/:productId', productController.checkDelivery);
  * @desc    Add new product
  * @access  Private (Vendor only)
  */
-router.post('/',
+router.post(
+  "/",
   authenticate,
-  authorizePermission('can_manage_products'),
+  authorizePermission("can_manage_products"),
   productController.addProduct
 );
 
@@ -83,9 +88,10 @@ router.post('/',
  * @desc    Update product
  * @access  Private (Vendor only - own products)
  */
-router.put('/:productId',
+router.put(
+  "/:productId",
   authenticate,
-  authorizePermission('can_manage_products'),
+  authorizePermission("can_manage_products"),
   productController.updateProduct
 );
 
@@ -94,9 +100,10 @@ router.put('/:productId',
  * @desc    Delete product (soft delete)
  * @access  Private (Vendor only - own products)
  */
-router.delete('/:productId',
+router.delete(
+  "/:productId",
   authenticate,
-  authorizePermission('can_manage_products'),
+  authorizePermission("can_manage_products"),
   productController.deleteProduct
 );
 
@@ -106,9 +113,11 @@ router.delete('/:productId',
  * @access  Private (Vendor only)
  * @query   page, limit, status, productType, sortBy, sortOrder
  */
-router.get('/vendor/my-products',
+router.get(
+  "/vendor/my-products",
   authenticate,
-  authorizePermission('can_manage_products'),
+  pagination,
+  authorizePermission("can_manage_products"),
   productController.getVendorProducts
 );
 
@@ -117,9 +126,10 @@ router.get('/vendor/my-products',
  * @desc    Update product status (active/inactive)
  * @access  Private (Vendor only - own products)
  */
-router.patch('/:productId/status',
+router.patch(
+  "/:productId/status",
   authenticate,
-  authorizePermission('can_manage_products'),
+  authorizePermission("can_manage_products"),
   productController.updateProductStatus
 );
 
@@ -129,9 +139,10 @@ router.patch('/:productId/status',
  * @access  Private (Vendor only - own products)
  * @body    { stock: number, variantIds?: string }
  */
-router.patch('/:productId/stock',
+router.patch(
+  "/:productId/stock",
   authenticate,
-  authorizePermission('can_manage_products'),
+  authorizePermission("can_manage_products"),
   productController.updateProductStock
 );
 

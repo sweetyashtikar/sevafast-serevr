@@ -1,0 +1,40 @@
+ ======  city ========
+GET = http://localhost:8000/api/cities
+POST = http://localhost:8000/api/cities/
+PUT = http://localhost:8000/api/cities/:id
+DELETE = http://localhost:8000/api/cities/:id
+
+======== category ============
+GET = http://localhost:8000/api/categories
+POST = http://localhost:8000/api/categories
+PUT = http://localhost:8000/api/categories/:id
+DELETE = http://localhost:8000/api/categories/:id
+
+======= roles =======
+GET = http://localhost:8000/api/roles
+POST = http://localhost:8000/api/roles
+PUT = http://localhost:8000/api/roles/:id
+DELETE = http://localhost:8000/api/roles/:id
+
+========== users ==========
+GET = http://localhost:8000/api/users
+POST = http://localhost:8000/api/users
+PUT = http://localhost:8000/api/users/:id
+DELETE = http://localhost:8000/api/users/:id
+
+========login =======
+POST = http://localhost:8000/api/login
+
+========forgot password =========
+POST  = http://localhost:8000/api/forgotpassword
+
+=========verifyotp========
+POST = http://localhost:8000/api/verifyotp
+
+==========resetpassword =========
+POST = http://localhost:8000/api/resetpassword
+
+
+
+
+
