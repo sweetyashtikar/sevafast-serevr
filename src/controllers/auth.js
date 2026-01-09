@@ -3,9 +3,10 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const {sendEmail,generateOTP} = require('../utils/sendmail');
 const User = require('../models/User');
-const { JWT_SECRET, JWT_EXPIRE } = require('../env-variables');
+const { JWT_SECRET, JWT_EXPIRE,NODE_ENV } = require('../env-variables');
 const { resetToken ,decodeToken} = require('../utils/jwt');
 const {sanitizeUser} = require('../utils/sanitizer');
+const {setTokenCookie, clearTokenCookie} = require('../utils/cookieHelper');
 
 const LoginUser = async (req, res) => {
     try {
@@ -30,17 +31,17 @@ const LoginUser = async (req, res) => {
         }
 
         // 3. Generate Token
-        const token = jwt.sign({ id: user._id, username : user.username, email: user.email }, JWT_SECRET, {expiresIn: JWT_EXPIRE});
+        const token = jwt.sign({ id: user._id, username : user.username, email: user.email,role: user.role  }, JWT_SECRET, {expiresIn: JWT_EXPIRE});
 
          user.last_login = new Date();
         await user.save({ validateBeforeSave: false });
 
-        const userresponse = sanitizeUser(user);
+        setTokenCookie(res, token);
 
         res.status(200).json({
             success: true,
-            token,
-            userresponse
+            message: 'Login successful',
+            user : sanitizeUser(user),
         });
     } catch (error) {
         console.log(error);
@@ -155,4 +156,18 @@ const resetPassword = async (req, res) => {
     }
 };
 
-module.exports = {sendEmail, LoginUser, ForgotPassword, VerifyOTP, resetPassword};
+const LogoutUser = async (req, res) => {
+    try {
+        clearTokenCookie(res);
+        
+        res.status(200).json({
+            success: true,
+            message: "Logged out successfully"
+        });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+module.exports = {sendEmail, LoginUser, ForgotPassword, VerifyOTP, resetPassword, LogoutUser};

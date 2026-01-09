@@ -126,7 +126,6 @@ userSchema.methods.comparePassword = async function (enteredPassword) {
 };
 
 // METHOD: Compare OTP for Verification
-// METHOD: Compare OTP for Verification
 userSchema.methods.compareResetCode = async function (enteredCode) {
   // Check if security exists, forgotten_password_code exists, and it's not undefined
   if (
