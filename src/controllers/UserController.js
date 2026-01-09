@@ -21,7 +21,10 @@ const RegisterUser = async (req, res) => {
         if (mobile) query.push({ mobile });
         
         const findEmailOrMobile = await User.findOne({ $or: query });
-        if (findEmailOrMobile) return res.status(400).json({ success: false, message: `User with this mobile or email already exists` });
+        if (findEmailOrMobile) {
+            const conflictField = findEmailOrMobile.email === email ? 'email' : 'mobile';
+            return res.status(400).json({ success: false, message: `User with this ${conflictField} already exists` });
+        }
 
         const findRole = await Roles.findOne({ role });
         if (!findRole) return res.status(400).json({ success: false ,message: 'Invalid role' });
