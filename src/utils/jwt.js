@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const { JWT_SECRET } = require('../env-variables');
 
-const resetToken = async(id, email, purpose)=>{
+const resetToken = (id, email, purpose)=>{
     const token = jwt.sign({ id, email, purpose}, JWT_SECRET, {
         expiresIn: "10m",
     });

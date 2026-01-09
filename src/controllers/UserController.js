@@ -8,7 +8,8 @@ const RegisterUser = async (req, res) => {
     try {
         const {  username, email, mobile, password, role, 
             latitude, longitude, address, city, pincode,
-            company, fcm_id } = req.body;
+            company, fcm_id , serviceable_zipcodes } = req.body;
+           const ip_address = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress || req.ip;
 
         // 2. Check that at least ONE contact method exists
         if (!email && !mobile) {
@@ -33,13 +34,14 @@ const RegisterUser = async (req, res) => {
             role: findRole._id,
             company,
             fcm_id,
-            ip_address: req.ip || req.connection.remoteAddress,
+            ip_address: ip_address,
             // Mapping Nested Address Object
             address_info: {
                 address,
                 city,
                 pincode
-            }
+            },
+            serviceable_zipcodes : serviceable_zipcodes || [],
         };
 
         // 5. Handle Geo-Location (GeoJSON format)

@@ -4,9 +4,24 @@ const bcrypt = require('bcryptjs');
 const {sendEmail,generateOTP} = require('../utils/sendmail');
 const User = require('../models/User');
 const { JWT_SECRET, JWT_EXPIRE,NODE_ENV } = require('../env-variables');
-const { resetToken ,decodeToken} = require('../utils/jwt');
+const { decodeToken, resetToken} = require('../utils/jwt');
 const {sanitizeUser} = require('../utils/sanitizer');
 const {setTokenCookie, clearTokenCookie} = require('../utils/cookieHelper');
+
+const checkBruteForce = async (loginIdentifier, ip) => {
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+    
+    // Count failed attempts in the last 15 minutes
+    const attempts = await LoginAttempt.countDocuments({
+        login: loginIdentifier,
+        ip_address: ip,
+        time: { $gte: fifteenMinutesAgo }
+    });
+
+    if (attempts >= 5) {
+        throw new Error("Too many failed attempts. Please try again in 15 minutes.");
+    }
+};
 
 const LoginUser = async (req, res) => {
     try {
@@ -115,13 +130,13 @@ const VerifyOTP = async (req, res) => {
             return res.status(400).json({ success: false, message: "Invalid OTP" });
         }
 
-        const resetToken = await resetToken(user._id, user.email, "reset");
+        const resettoken = await resetToken(user._id, user.email, "reset");
 
         user.security.forgotten_password_code = undefined;
         user.security.forgotten_password_time = undefined;
         await user.save({ validateBeforeSave: false });
 
-        res.status(200).json({ success: true, message: "OTP verified successfully", resetToken });
+        res.status(200).json({ success: true, message: "OTP verified successfully", resettoken });
     } catch (error) {
         console.log(error);
         res.status(500).json({ success: false, message: error.message });

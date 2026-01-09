@@ -36,7 +36,7 @@ const userSchema = new mongoose.Schema(
       activation_selector: { type: String },
       activation_code: { type: String },
       forgotten_password_selector: { type: String },
-      forgotten_password_code: { type: String }, // Explicitly define type
+      forgotten_password_code: { type: String }, // otp hashed
       forgotten_password_time: { type: Date },
       remember_selector: { type: String },
       remember_code: { type: String },
@@ -56,8 +56,8 @@ const userSchema = new mongoose.Schema(
       area: String,
       city: String,
       pincode: String,
-      serviceable_zipcodes: [String], // Converted to array for easier searching
     },
+    serviceable_zipcodes: [String], // Converted to array for easier searching
 
     // --- Geo-Location (Standardized) ---
     location: {

@@ -29,6 +29,7 @@ connection.once('open', () => {
 
 
 /* Routes */
+app.set('trust proxy', true);
 app.use('/api', userRoute);
 app.use('/api', authRoute);
 app.use('/api', roleRoute);
