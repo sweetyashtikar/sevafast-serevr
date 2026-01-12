@@ -51,7 +51,7 @@ const variantSchema = new mongoose.Schema(
       default: 0,
     },
     stockStatus: {
-      type: Number,
+      type: String,
       enum: [STOCK_STATUS.IN_STOCK, STOCK_STATUS.OUT_OF_STOCK],
       default: STOCK_STATUS.IN_STOCK,
     },
@@ -133,7 +133,7 @@ const productSchema = new mongoose.Schema(
     categoryId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Category",
-      required: [true, "Category is required"],
+      // required: [true, "Category is required"],
       index: true,
     },
 
@@ -164,7 +164,7 @@ const productSchema = new mongoose.Schema(
     },
 
     indicator: {
-      type: Number,
+      type: String,
       enum: [
         INDICATOR_TYPES.NONE,
         INDICATOR_TYPES.VEG,
@@ -274,11 +274,11 @@ const productSchema = new mongoose.Schema(
         default: 0,
       },
 
-      stockStatus: {
-        type: Number,
-        enum: [ STOCK_STATUS.IN_STOCK, STOCK_STATUS.OUT_OF_STOCK],
-        default: STOCK_STATUS.IN_STOCK,
-      },
+    stockStatus: {
+      type: String,
+      enum: [STOCK_STATUS.IN_STOCK, STOCK_STATUS.OUT_OF_STOCK],
+      default: STOCK_STATUS.IN_STOCK,
+    },
     },
 
     // ==========================================
@@ -310,11 +310,11 @@ const productSchema = new mongoose.Schema(
         min: 0,
         default: 0,
       },
-      stockStatus: {
-        type: Number,
-        enum: [STOCK_STATUS.IN_STOCK, STOCK_STATUS.OUT_OF_STOCK],
-        default: STOCK_STATUS.IN_STOCK,
-      },
+    stockStatus: {
+      type: String,
+      enum: [STOCK_STATUS.IN_STOCK, STOCK_STATUS.OUT_OF_STOCK],
+      default: STOCK_STATUS.IN_STOCK,
+    },
     },
 
     // ==========================================
@@ -322,7 +322,7 @@ const productSchema = new mongoose.Schema(
     // ==========================================
 
     deliverableType: {
-      type: Number,
+      type: String,
       enum: Object.values(DELIVERABLE_TYPES),
       default: DELIVERABLE_TYPES.ALL,
     },
@@ -388,7 +388,7 @@ const productSchema = new mongoose.Schema(
 
     mainImage: {
       type: String,
-      required: [true, "Main product image is required"],
+      // required: [true, "Main product image is required"],
       trim: true,
     },
 
@@ -445,7 +445,7 @@ const productSchema = new mongoose.Schema(
     // STATUS & METADATA
     // ==========================================
 
-    isActive: {
+    status: {
       type: Boolean,
       default: true,
       index: true,
@@ -619,7 +619,6 @@ productSchema.pre("save", function (next) {
     // Add random suffix to ensure uniqueness
     this.slug += `-${Date.now().toString(36)}`;
   }
-  next();
 });
 
 // Validate deliverable zipcodes based on deliverable type
@@ -636,7 +635,7 @@ productSchema.pre("save", function (next) {
       );
     }
   }
-  next();
+  // next();
 });
 
 // Validate digital product requirements
@@ -659,7 +658,7 @@ productSchema.pre("save", function (next) {
       );
     }
   }
-  next();
+  // next();
 });
 
 // ==========================================

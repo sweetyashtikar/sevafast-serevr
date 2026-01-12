@@ -1,4 +1,4 @@
-const City = require('../models/cities');
+const City = require('../models/city');
 const { ObjectId } = require('mongodb');
 
 // @desc    Get all cities (with pagination, search, sort)

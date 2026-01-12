@@ -2,11 +2,13 @@ const express = require("express");
 const Category = require("../controllers/categoryController");
 const router = express.Router();
 const { pagination } = require("../middleware/pagination");
+const { authenticate, authorizePermission } = require("../middleware/authMiddleware");
 
 router
   .route("/categories")
   .get(pagination, Category.getAllCategories)
-  .post(Category.createCategory);
+  .post( authenticate,
+         authorizePermission("can_manage_products"),Category.createCategory);
 
 router
   .route("/categories/:id")

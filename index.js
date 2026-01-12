@@ -3,6 +3,9 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 const { MONGODB_URI } = require('./src/env-variables');
 
+
+
+
 const app = express();
 const port = process.env.PORT || 5000;
 
@@ -18,6 +21,7 @@ const cityRoutes = require('./src/routes/cityRoutes');
 /* Middleware */
 app.use(cors());
 app.use(express.json()); // 👈 body-parser replace (simple & modern)
+
 
 /* MongoDB Connection */
 mongoose.connect(MONGODB_URI);

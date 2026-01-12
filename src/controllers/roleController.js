@@ -3,14 +3,14 @@ const Roles = require('../models/roles');
 // Create a new role
 const createRole = async (req, res) => {    
     try {
-        const { role } = req.body;
+        const { role,can_manage_products } = req.body;
 
         if (!role) return res.status(400).json({success:false, message: 'Role name is required' });
         
         const findRole = await Roles.findOne({ role });
         if (findRole)  return  res.status(400).json({ success:false, message: 'Role already exists' });
         
-        const newRole = new Roles({ role });
+        const newRole = new Roles({ role, can_manage_products });
         await newRole.save();
         res.status(201).json({
             success: true, 

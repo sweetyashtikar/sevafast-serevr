@@ -6,21 +6,21 @@ const PRODUCT_TYPES = {
 };
 
 const INDICATOR_TYPES = {
-  NONE: 0,
-  VEG: 1,
-  NON_VEG: 2,
+  NONE: "none",
+  VEG: "veg",
+  NON_VEG: "non_veg",
 };
 
 const DELIVERABLE_TYPES = {
-  NONE: 0, // Not shippable (service/local pickup only)
-  ALL: 1, // Can ship anywhere
-  INCLUDE: 2, // Only specific zipcodes
-  EXCLUDE: 3, // Everywhere except specific zipcodes
+  NONE: "none", // Not shippable (service/local pickup only)
+  ALL: "all", // Can ship anywhere
+  INCLUDE: "include", // Only specific zipcodes
+  EXCLUDE: "exclude", // Everywhere except specific zipcodes
 };
 
 const STOCK_STATUS = {
-  IN_STOCK: 1,
-  OUT_OF_STOCK: 0,
+  IN_STOCK: "in-stock",
+  OUT_OF_STOCK: "out-of-stock",
 };
 
 const CANCELABLE_STAGES = {

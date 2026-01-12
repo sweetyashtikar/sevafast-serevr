@@ -1,3 +1,11 @@
+  // Helper functions
+    const toArray = (str) => str ? str.split(',').map(s => s.trim()) : [];
+    const toInt = (val, def = 0) => parseInt(val) || def;
+    const toFloat = (val, def = 0) => parseFloat(val) || def;
+    const toBool = (val) => Boolean(parseInt(val));
+    const isDefined = (val) => val !== undefined && val !== null && val !== '';
+
+
 // utils/userSanitizer.js
 const sanitizeUser = (user, options = {}) => {
     const defaultOptions = {
@@ -66,9 +74,46 @@ const sanitizeUserForSelf = (user) => {
     });
 };
 
+
+// const checkStatus = async (model , id) => {
+//     const validateStatus = await model.findOne(id).select('status');
+//     console.log(" validateStatus ", validateStatus);
+
+//     if(!validateStatus){
+//         return res.status(400).json({
+//           success: false,
+//           message: 'Invalid category ID'
+//         });
+//       }
+
+//     if(!validateStatus.status){
+//         return false;
+//     }
+//     return validateStatus._id;
+// }
+
+const checkStatus = async (model, id) => {
+    const validateStatus = await model.findById(id).select('status');
+    console.log("validateStatus", validateStatus)
+    
+    if (!validateStatus || !validateStatus.status) {
+        return null; // Return null for invalid/inactive
+    }
+    
+    return validateStatus._id;
+}
+
 module.exports = {
     sanitizeUser,
     sanitizeUserForPublic,
     sanitizeUserForAdmin,
-    sanitizeUserForSelf
+    sanitizeUserForSelf,
+    checkStatus,
+    toArray,
+    toInt,
+    toFloat,
+    toBool,
+    isDefined
+
+
 };

@@ -57,7 +57,7 @@ const userSchema = new mongoose.Schema(
       city: String,
       pincode: String,
     },
-    serviceable_zipcodes: [String], // Converted to array for easier searching
+    zipcodes: [String], // Converted to array for easier searching
 
     // --- Geo-Location (Standardized) ---
     location: {
@@ -76,6 +76,7 @@ const userSchema = new mongoose.Schema(
     timestamps: true, // Automatically handles created_at and updated_at
   }
 );
+
 
 // PRE-SAVE HOOK: Hash password before saving to DB
 userSchema.pre("save", async function (next) {

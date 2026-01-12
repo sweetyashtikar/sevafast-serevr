@@ -6,250 +6,54 @@ const {
   STOCK_STATUS,
   STOCK_LEVEL_TYPES 
 } = require('../types/productTypes');
+const Category = require('../models/category');
+const { checkStatus ,toArray,toInt, toFloat,toBool} = require('../utils/sanitizer');
+const {  mapBasicInfo, mapCategorization, mapTaxPricing, mapInventory,mapProductType,mapShipping,mapDimensions, mapPolicies,mapMedia,mapDigitalProduct,addProductTypeData,
+    updateBasicInfo, updateCategorization,updateTaxPricing, updateInventory,updateShipping, updateDimensions,updatePolicies,updateMedia,updateDigitalProduct,updateProductTypeData } = require('../utils/productHelper');
+
+
+
 
 // ==========================================
 // ADD PRODUCT
 // ==========================================
 
-exports.addProduct = async (req, res) => {
+const addProduct = async (req, res) => {
   try {
-    const {
-      // Basic Info
-      pro_input_name,
-      short_description,
-      pro_input_description,
-      extra_input_description,
-      
-      // Categorization
-      category_id,
-      tags,
-      brand,
-      hsn_code,
-      made_in,
-      indicator,
-      attribute_values,
-      
-      // Tax & Pricing
-      pro_input_tax,
-      is_prices_inclusive_tax,
-      
-      // Inventory
-      total_allowed_quantity,
-      minimum_order_quantity,
-      quantity_step_size,
-      
-      // Product Type
-      product_type,
-      variant_stock_level_type,
-      
-      // Shipping
-      deliverable_type,
-      deliverable_zipcodes,
-      pickup_location,
-      
-      // Policies
-      cod_allowed,
-      is_returnable,
-      is_cancelable,
-      cancelable_till,
-      warranty_period,
-      guarantee_period,
-      
-      // Media
-      pro_input_image,
-      other_images,
-      video_type,
-      video,
-      pro_input_video,
-      
-      // Digital Product
-      download_allowed,
-      download_link_type,
-      pro_input_zip,
-      download_link,
-      
-      // Simple Product Data
-      simple_price,
-      simple_special_price,
-      simple_product_stock_status,
-      product_sku,
-      product_total_stock,
-      weight,
-      height,
-      breadth,
-      length,
-      
-      // Variable Product Data
-      variants_ids,
-      variant_price,
-      variant_special_price,
-      variant_images,
-      variant_sku,
-      variant_total_stock,
-      variant_level_stock_status,
-      sku_variant_type,
-      total_stock_variant_type,
-      variant_status,
-      
-      status
-    } = req.body;
+   const body = req.body;
+    console.log("Add Product Request Body:", body);
+
 
     // Get vendor ID from authenticated user
     const vendorId = req.user._id;
 
-    // Convert tags from comma-separated string to array
-    const tagsArray = tags ? tags.split(',').map(tag => tag.trim()) : [];
-    
-    // Convert deliverable_zipcodes from comma-separated to array
-    const zipcodesArray = deliverable_zipcodes ? 
-      deliverable_zipcodes.split(',').map(zip => zip.trim()) : [];
+    // const category = await Category.findById( categoryId);
+    const categoryId = await checkStatus(Category , body.categoryId)
+    console.log("categoryId", categoryId)
+    if (!categoryId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Category is inactive or invalid'
+      });
+    }
 
-    // Convert attribute_values from comma-separated to array
-    const attributeValuesArray = attribute_values ? 
-      attribute_values.split(',').map(val => val.trim()) : [];
-
-    // Base product data
     const productData = {
       vendorId,
-      name: pro_input_name,
-      shortDescription: short_description,
-      description: pro_input_description,
-      extraDescription: extra_input_description,
-      
-      categoryId: category_id,
-      tags: tagsArray,
-      brand,
-      hsnCode: hsn_code,
-      madeIn: made_in || 'India',
-      indicator: parseInt(indicator) || 0,
-      attributeValues: attributeValuesArray,
-      
-      taxId: pro_input_tax,
-      isPricesInclusiveTax: Boolean(parseInt(is_prices_inclusive_tax)),
-      
-      totalAllowedQuantity: parseInt(total_allowed_quantity) || 999999,
-      minimumOrderQuantity: parseInt(minimum_order_quantity) || 1,
-      quantityStepSize: parseInt(quantity_step_size) || 1,
-      
-      productType: product_type,
-      variantStockLevelType: variant_stock_level_type,
-      
-      deliverableType: parseInt(deliverable_type) || DELIVERABLE_TYPES.ALL,
-      deliverableZipcodes: zipcodesArray,
-      pickupLocation: pickup_location,
-      
-      dimensions: {
-        weight: parseFloat(weight) || 0,
-        height: parseFloat(height) || 0,
-        breadth: parseFloat(breadth) || 0,
-        length: parseFloat(length) || 0
-      },
-      
-      codAllowed: Boolean(parseInt(cod_allowed)),
-      isReturnable: Boolean(parseInt(is_returnable)),
-      isCancelable: Boolean(parseInt(is_cancelable)),
-      cancelableTill: cancelable_till,
-      warrantyPeriod: warranty_period,
-      guaranteePeriod: guarantee_period,
-      
-      mainImage: pro_input_image,
-      otherImages: other_images || [],
-      
-      video: {
-        type: video_type,
-        url: video,
-        file: pro_input_video
-      },
-      
-      downloadAllowed: Boolean(parseInt(download_allowed)),
-      downloadLinkType: download_link_type,
-      downloadFile: pro_input_zip,
-      downloadLink: download_link,
-      
-      isActive: status === undefined ? true : Boolean(parseInt(status))
+      ...mapBasicInfo(body,categoryId),
+      ...mapCategorization(body, categoryId, toArray),
+      ...mapTaxPricing(body, toBool),
+      ...mapInventory(body, toInt),
+      ...mapProductType(body),
+      ...mapShipping(body, toInt, toArray),
+      ...mapDimensions(body, toFloat),
+      ...mapPolicies(body, toBool),
+      ...mapMedia(body),
+      ...mapDigitalProduct(body, toBool),
+      status: body.status === undefined ? true : toBool(body.status)
     };
+    
+    addProductTypeData(productData, body, toInt, toFloat, toArray);
 
-    // Handle Simple Product
-    if (product_type === PRODUCT_TYPES.SIMPLE) {
-      productData.simpleProduct = {
-        price: parseFloat(simple_price),
-        specialPrice: simple_special_price ? parseFloat(simple_special_price) : undefined,
-        sku: product_sku,
-        totalStock: parseInt(product_total_stock) || 0,
-        stockStatus: simple_product_stock_status !== undefined ? 
-          parseInt(simple_product_stock_status) : null
-      };
-    }
-
-    // Handle Digital Product
-    if (product_type === PRODUCT_TYPES.DIGITAL) {
-      productData.simpleProduct = {
-        price: parseFloat(simple_price),
-        specialPrice: simple_special_price ? parseFloat(simple_special_price) : undefined
-      };
-    }
-
-    // Handle Variable Product
-    if (product_type === PRODUCT_TYPES.VARIABLE) {
-      // Parse variant data
-      const variantIdsArray = variants_ids.split(',').map(v => v.trim());
-      const variantPriceArray = variant_price.split(',').map(p => parseFloat(p));
-      const variantSpecialPriceArray = variant_special_price ? 
-        variant_special_price.split(',').map(p => parseFloat(p)) : [];
-      
-      // Build variants array
-      productData.variants = variantIdsArray.map((ids, index) => {
-        const variant = {
-          variantIds: ids,
-          price: variantPriceArray[index],
-          specialPrice: variantSpecialPriceArray[index] || undefined,
-          images: variant_images ? variant_images[index] : []
-        };
-
-        // Add dimensions if provided (arrays)
-        if (weight) {
-          const weights = weight.split(',');
-          variant.weight = parseFloat(weights[index]) || 0;
-        }
-        if (height) {
-          const heights = height.split(',');
-          variant.height = parseFloat(heights[index]) || 0;
-        }
-        if (breadth) {
-          const breadths = breadth.split(',');
-          variant.breadth = parseFloat(breadths[index]) || 0;
-        }
-        if (length) {
-          const lengths = length.split(',');
-          variant.length = parseFloat(lengths[index]) || 0;
-        }
-
-        // Variable level stock management
-        if (variant_stock_level_type === STOCK_LEVEL_TYPES.VARIABLE_LEVEL) {
-          const skuArray = variant_sku ? variant_sku.split(',') : [];
-          const stockArray = variant_total_stock ? variant_total_stock.split(',') : [];
-          const statusArray = variant_level_stock_status ? 
-            variant_level_stock_status.split(',') : [];
-
-          variant.sku = skuArray[index] || '';
-          variant.totalStock = parseInt(stockArray[index]) || 0;
-          variant.stockStatus = parseInt(statusArray[index]) || STOCK_STATUS.IN_STOCK;
-        }
-
-        return variant;
-      });
-
-      // Product level stock management
-      if (variant_stock_level_type === STOCK_LEVEL_TYPES.PRODUCT_LEVEL) {
-        productData.productLevelStock = {
-          sku: sku_variant_type,
-          totalStock: parseInt(total_stock_variant_type) || 0,
-          stockStatus: parseInt(variant_status) || STOCK_STATUS.IN_STOCK
-        };
-      }
-    }
-
-    // Create product
     const product = new Product(productData);
     await product.save();
 
@@ -273,10 +77,11 @@ exports.addProduct = async (req, res) => {
 // UPDATE PRODUCT
 // ==========================================
 
-exports.updateProduct = async (req, res) => {
+const updateProduct = async (req, res) => {
   try {
     const { productId } = req.params;
     const vendorId = req.user._id;
+    const body = req.body;
 
     // Find product
     const product = await Product.findOne({
@@ -292,48 +97,61 @@ exports.updateProduct = async (req, res) => {
       });
     }
 
-    // Update fields (same logic as add, but updating existing product)
-    const {
-      pro_input_name,
-      short_description,
-      pro_input_description,
-      category_id,
-      tags,
-      brand,
-      indicator,
-      simple_price,
-      simple_special_price,
-      product_total_stock,
-      status
-    } = req.body;
+    console.log("Update Product Request Body:", body);
 
-    // Update basic fields
-    if (pro_input_name) product.name = pro_input_name;
-    if (short_description) product.shortDescription = short_description;
-    if (pro_input_description) product.description = pro_input_description;
-    if (category_id) product.categoryId = category_id;
-    if (brand) product.brand = brand;
-    if (indicator !== undefined) product.indicator = parseInt(indicator);
-    if (status !== undefined) product.isActive = Boolean(parseInt(status));
+    // Helper functions
+    const toArray = (str) => str ? str.split(',').map(s => s.trim()) : [];
+    const toInt = (val, def = 0) => parseInt(val) || def;
+    const toFloat = (val, def = 0) => parseFloat(val) || def;
+    const toBool = (val) => Boolean(parseInt(val));
+    const isDefined = (val) => val !== undefined && val !== null && val !== '';
 
-    // Update tags
-    if (tags) {
-      product.tags = tags.split(',').map(tag => tag.trim());
+    // Validate and update category if provided
+    if (isDefined(body.categoryId)) {
+      const categoryId = await checkStatus(Category, body.categoryId);
+      if (!categoryId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Category is inactive or invalid'
+        });
+      }
+      product.categoryId = categoryId;
     }
 
-    // Update simple product data
-    if (product.productType === PRODUCT_TYPES.SIMPLE) {
-      if (simple_price) {
-        product.simpleProduct.price = parseFloat(simple_price);
-      }
-      if (simple_special_price !== undefined) {
-        product.simpleProduct.specialPrice = simple_special_price ? 
-          parseFloat(simple_special_price) : undefined;
-      }
-      if (product_total_stock !== undefined) {
-        product.simpleProduct.totalStock = parseInt(product_total_stock);
-      }
+    // Update basic information
+    updateBasicInfo(product, body);
+    
+    // Update categorization
+    updateCategorization(product, body, toArray, toInt);
+    
+    // Update tax & pricing
+    updateTaxPricing(product, body, toBool);
+    
+    // Update inventory
+    updateInventory(product, body, toInt);
+    
+    // Update shipping
+    updateShipping(product, body, toInt, toArray);
+    
+    // Update dimensions
+    updateDimensions(product, body, toFloat);
+    
+    // Update policies
+    updatePolicies(product, body, toBool);
+    
+    // Update media
+    updateMedia(product, body);
+    
+    // Update digital product settings
+    updateDigitalProduct(product, body, toBool);
+    
+    // Update status
+    if (isDefined(body.status)) {
+      product.status = toBool(body.status);
     }
+
+    // Update product type specific data
+    updateProductTypeData(product, body, toInt, toFloat, toArray, isDefined);
 
     await product.save();
 
@@ -357,7 +175,7 @@ exports.updateProduct = async (req, res) => {
 // DELETE PRODUCT (Soft Delete)
 // ==========================================
 
-exports.deleteProduct = async (req, res) => {
+const deleteProduct = async (req, res) => {
   try {
     const { productId } = req.params;
     const vendorId = req.user._id;
@@ -373,6 +191,15 @@ exports.deleteProduct = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'Product not found'
+      });
+    }
+
+   const categoryId = await checkStatus(Category , body.categoryId)
+    console.log("categoryId", categoryId)
+    if (!categoryId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Category is inactive or invalid'
       });
     }
 
@@ -401,7 +228,7 @@ exports.deleteProduct = async (req, res) => {
 // GET SINGLE PRODUCT
 // ==========================================
 
-exports.getProduct = async (req, res) => {
+const getProduct = async (req, res) => {
   try {
     const { productId } = req.params;
 
@@ -442,7 +269,7 @@ exports.getProduct = async (req, res) => {
 // GET ALL PRODUCTS (with filters)
 // ==========================================
 
-exports.getAllProducts = async (req, res) => {
+const getAllProducts = async (req, res) => {
   try {
     const {
       page = 1,
@@ -558,7 +385,7 @@ exports.getAllProducts = async (req, res) => {
 // GET VENDOR PRODUCTS
 // ==========================================
 
-exports.getVendorProducts = async (req, res) => {
+const getVendorProducts = async (req, res) => {
   try {
     const vendorId = req.user._id;
     const { limit, offset, sort, searchQuery, filters } = req.paginationQuery;
@@ -623,7 +450,7 @@ exports.getVendorProducts = async (req, res) => {
 // GET PRODUCTS BY CATEGORY
 // ==========================================
 
-exports.getProductsByCategory = async (req, res) => {
+const getProductsByCategory = async (req, res) => {
   try {
     const { categoryId } = req.params;
     const { page = 1, limit = 20, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
@@ -676,7 +503,7 @@ exports.getProductsByCategory = async (req, res) => {
 // SEARCH PRODUCTS
 // ==========================================
 
-exports.searchProducts = async (req, res) => {
+const searchProducts = async (req, res) => {
   try {
     const { query, page = 1, limit = 20 } = req.query;
 
@@ -734,7 +561,7 @@ exports.searchProducts = async (req, res) => {
 // UPDATE PRODUCT STATUS
 // ==========================================
 
-exports.updateProductStatus = async (req, res) => {
+const updateProductStatus = async (req, res) => {
   try {
     const { productId } = req.params;
     const { status } = req.body;
@@ -776,7 +603,7 @@ exports.updateProductStatus = async (req, res) => {
 // UPDATE PRODUCT STOCK
 // ==========================================
 
-exports.updateProductStock = async (req, res) => {
+const updateProductStock = async (req, res) => {
   try {
     const { productId } = req.params;
     const { stock, variantIds } = req.body;
@@ -840,7 +667,7 @@ exports.updateProductStock = async (req, res) => {
 // CHECK DELIVERY AVAILABILITY
 // ==========================================
 
-exports.checkDelivery = async (req, res) => {
+const checkDelivery = async (req, res) => {
   try {
     const { productId } = req.params;
     const { zipcode } = req.query;
@@ -892,7 +719,7 @@ exports.checkDelivery = async (req, res) => {
 // GET FEATURED PRODUCTS
 // ==========================================
 
-exports.getFeaturedProducts = async (req, res) => {
+const getFeaturedProducts = async (req, res) => {
   try {
     const { limit = 10 } = req.query;
 
@@ -926,7 +753,7 @@ exports.getFeaturedProducts = async (req, res) => {
 // GET RELATED PRODUCTS
 // ==========================================
 
-exports.getRelatedProducts = async (req, res) => {
+const getRelatedProducts = async (req, res) => {
   try {
     const { productId } = req.params;
     const { limit = 8 } = req.query;
@@ -964,4 +791,20 @@ exports.getRelatedProducts = async (req, res) => {
       error: error.message
     });
   }
+};
+
+module.exports = {
+  addProduct,
+  updateProduct,
+  deleteProduct,
+  getProduct,
+  getAllProducts,
+  getVendorProducts,
+  getProductsByCategory,
+  searchProducts,
+  updateProductStatus,
+  updateProductStock,
+  checkDelivery,
+  getFeaturedProducts,
+  getRelatedProducts
 };
