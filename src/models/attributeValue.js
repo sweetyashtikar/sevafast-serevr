@@ -6,8 +6,6 @@ const swatcheType = {
     IMAGE: "image" 
 };
 
-
-
 const attributeValueSchema = new mongoose.Schema({
     // Link to the parent Attribute (e.g., 'Size' or 'Color')
     attribute_id: {
@@ -16,6 +14,11 @@ const attributeValueSchema = new mongoose.Schema({
         required: true
     },
 
+    // Whether this value should appear in the sidebar filters
+    filterable: { 
+        type: Boolean, 
+        default: false 
+    },
     // The actual value: 'small', 'blue', '1kg', etc.
     value: { 
         type: String, 
@@ -36,11 +39,6 @@ const attributeValueSchema = new mongoose.Schema({
         default: '' 
     },
 
-    // Whether this value should appear in the sidebar filters
-    filterable: { 
-        type: Boolean, 
-        default: false 
-    },
 
     // true for Active, false for Inactive
     status: { 

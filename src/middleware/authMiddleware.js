@@ -2,10 +2,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User'); 
 const Role = require('../models/roles'); 
 
-/**
- * 1. Authenticate: Strict check
- * Blocks the request if no valid token is found.
- */
+
 const authenticate = async (req, res, next) => {
     try {
         let token;
@@ -24,8 +21,12 @@ const authenticate = async (req, res, next) => {
 
         // Attach user to request (Excluding password)
         const user = await User.findById(decoded.id).select('-password');
+
+        if (!user.active ) {
+            return res.status(404).json({ success: false, message: "You cannot add products as you are Inactive" });
+        }
         
-        if (!user) {
+        if (!user ) {
             return res.status(404).json({ success: false, message: "User no longer exists." });
         }
 
@@ -73,9 +74,8 @@ const authorizePermission = (permissionField) => {
             if (!req.user) {
                 return res.status(401).json({ message: "Authentication required." });
             }
-
             // Look up the role settings in your Role collection
-            const roleData = await Role.findOne({ role: req.user.role });
+            const roleData = await Role.findOne({ _id: req.user.role });
 
             if (!roleData) {
                 return res.status(403).json({ message: "Role permissions not configured." });

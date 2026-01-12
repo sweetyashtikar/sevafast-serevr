@@ -99,13 +99,6 @@ const updateProduct = async (req, res) => {
 
     console.log("Update Product Request Body:", body);
 
-    // Helper functions
-    const toArray = (str) => str ? str.split(',').map(s => s.trim()) : [];
-    const toInt = (val, def = 0) => parseInt(val) || def;
-    const toFloat = (val, def = 0) => parseFloat(val) || def;
-    const toBool = (val) => Boolean(parseInt(val));
-    const isDefined = (val) => val !== undefined && val !== null && val !== '';
-
     // Validate and update category if provided
     if (isDefined(body.categoryId)) {
       const categoryId = await checkStatus(Category, body.categoryId);

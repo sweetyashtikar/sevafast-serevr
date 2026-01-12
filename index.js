@@ -15,6 +15,9 @@ const roleRoute = require('./src/routes/roleRoute');
 const categoryRoute = require('./src/routes/categoryRoute');
 const productRoute = require('./src/routes/productRoute');
 const cityRoutes = require('./src/routes/cityRoutes');
+const attributeSetRoute = require('./src/routes/attributeSet')
+const attributeRoute = require('./src/routes/attributeRoute')
+const attributeValueRoute = require("./src/routes/attributeValue")
 
 
 
@@ -36,10 +39,14 @@ connection.once('open', () => {
 app.set('trust proxy', true);
 app.use('/api', userRoute);
 app.use('/api', authRoute);
-app.use('/api', roleRoute);
-app.use('/api', categoryRoute);
-app.use('/api', productRoute);
-app.use('/api', cityRoutes);
+app.use('/api/role', roleRoute);
+app.use('/api/category', categoryRoute);
+app.use('/api/product', productRoute);
+app.use('/api/cities', cityRoutes);
+app.use('/api/attributeSet', attributeSetRoute)
+app.use('/api/attribute', attributeRoute)
+app.use('/api/attributeValue',attributeValueRoute)
+
 
 
 
