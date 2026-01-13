@@ -30,9 +30,8 @@ const categorySchema = new mongoose.Schema({
         default: 0
     },
     status: {
-        type: String, // "Active" or "Inactive"
-        default: "Active",
-        enum: ["Active", "Inactive"]
+        type: Boolean, // "Active" or "Inactive"
+        default: true,
     },
     clicks: {
         type: Number,

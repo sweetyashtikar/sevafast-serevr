@@ -18,13 +18,13 @@ function mapCategorization(body, categoryId,toArray){
     hsnCode : body.hsn_code,
     madeIn : body.made_in || 'India',
     indicator : body.indicator || INDICATOR_TYPES.NONE,
-    attributeValues : toArray(body.attribute_values),
+    attributeValues : body.attributeValues,
   }
 }
 
 function mapTaxPricing(body, toBool){
   return{
-    taxId : body.pro_input_tax,
+    taxId : body.taxId,
     isPricesInclusiveTax : toBool(body.is_prices_inclusive_tax),
   }
 }

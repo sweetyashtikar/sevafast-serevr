@@ -18,6 +18,7 @@ const cityRoutes = require('./src/routes/cityRoutes');
 const attributeSetRoute = require('./src/routes/attributeSet')
 const attributeRoute = require('./src/routes/attributeRoute')
 const attributeValueRoute = require("./src/routes/attributeValue")
+const taxRoute = require('./src/routes/taxRoute')
 
 
 
@@ -46,6 +47,7 @@ app.use('/api/cities', cityRoutes);
 app.use('/api/attributeSet', attributeSetRoute)
 app.use('/api/attribute', attributeRoute)
 app.use('/api/attributeValue',attributeValueRoute)
+app.use('/api/tax',taxRoute)
 
 
 

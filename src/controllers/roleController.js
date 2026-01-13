@@ -25,7 +25,7 @@ const createRole = async (req, res) => {
 //get all roles
 const getAllRoles = async (req, res) => {
     try {
-        const roles = await Roles.find();
+        const roles = await Roles.find({role : {$ne :'admin'}});
         res.status(200).json({success : true , data :roles});
     } catch (error) {
         res.status(500).json({ success:false, message: error.message });

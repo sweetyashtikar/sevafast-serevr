@@ -15,8 +15,7 @@ const createCategory = async (req, res) => {
             image,
             banner,
             row_order,
-            status : "Active",
-        });
+        })
 
         await newCategory.save();
         res.status(201).json({ success: true, message: 'Category created successfully', data: newCategory });

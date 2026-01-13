@@ -6,8 +6,6 @@ const Role = require('../models/roles');
 const authenticate = async (req, res, next) => {
     try {
         let token;
-
-        // Check for token in Headers (Bearer Token)
         if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
             token = req.headers.authorization.split(' ')[1];
         }
@@ -16,18 +14,21 @@ const authenticate = async (req, res, next) => {
             return res.status(401).json({ success: false, message: "Access denied. No token provided." });
         }
 
-        // Verify token
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-        // Attach user to request (Excluding password)
-        const user = await User.findById(decoded.id).select('-password');
+        // POPULATE role here so that checkIfAdmin has access to the role name
+        const user = await User.findById(decoded.id)
+            .select('-password')
+            .populate('role'); 
 
-        if (!user.active ) {
-            return res.status(404).json({ success: false, message: "You cannot add products as you are Inactive" });
-        }
-        
-        if (!user ) {
+        // 1. CHECK IF USER EXISTS FIRST
+        if (!user) {
             return res.status(404).json({ success: false, message: "User no longer exists." });
+        }
+
+        // 2. THEN CHECK IF ACTIVE
+        if (!user.active) {
+            return res.status(403).json({ success: false, message: "Your account is inactive." });
         }
 
         req.user = user; 
@@ -91,6 +92,24 @@ const authorizePermission = (permissionField) => {
             res.status(500).json({ message: "Authorization error", error: error.message });
         }
     };
+}
+
+const checkIfAdmin  = async (req, res, next) => {
+        try {
+            if (!req.user) {
+                return res.status(401).json({ message: "Authentication required." });
+            }
+            const role = req.user.role?.role
+            if (role === 'admin') {
+                return next();
+            }
+
+            return res.status(403).json({ message: "You do not have permission to perform this action." });
+        } catch (error) {
+            console.log("hey error", error)
+            res.status(500).json({ message: "Authorization error", error: error.message });
+        }
 };
 
-module.exports = { authenticate, optionalAuth, authorizePermission };
+
+module.exports = { authenticate, optionalAuth, authorizePermission,checkIfAdmin };

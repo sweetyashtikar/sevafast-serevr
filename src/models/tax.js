@@ -27,6 +27,6 @@ const taxSchema = new mongoose.Schema(
 );
 
 // Index for active taxes (commonly used in product creation dropdowns)
-taxSchema.index({ status: 1 });
+taxSchema.index({ title: 1 });
 
 module.exports = mongoose.model("Tax", taxSchema);

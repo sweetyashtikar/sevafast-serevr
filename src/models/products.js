@@ -458,7 +458,7 @@ const productSchema = new mongoose.Schema(
 
     approvedBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: "admin",
     },
 
     approvedAt: {

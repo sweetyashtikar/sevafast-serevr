@@ -10,6 +10,7 @@ const RegisterUser = async (req, res) => {
             latitude, longitude, address, city, pincode,
             company, fcm_id , zipcodes } = req.body;
            const ip_address = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress || req.ip;
+           console
 
         // 2. Check that at least ONE contact method exists
         if (!email && !mobile) {
@@ -70,7 +71,7 @@ const RegisterUser = async (req, res) => {
 const getAllUsers = async (req, res) => {
     try {
         const users = await User.find().populate('role');   
-        res.status(200).json({success : true , data :users});
+        res.status(200).json({success : true , data :nonAdminUsers});
     } catch (error) {
         res.status(500).json({ success: false ,message: error.message });
     }

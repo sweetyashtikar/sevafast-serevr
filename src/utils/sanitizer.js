@@ -92,10 +92,20 @@ const sanitizeUserForSelf = (user) => {
 //     return validateStatus._id;
 // }
 
-const checkStatus = async (model, id) => {
-    const validateStatus = await model.findById(id).select('status');
-    console.log("validateStatus", validateStatus)
-    
+const checkStatus = async (model, ids) => {
+
+    if(Array.isArray(ids)){
+        const activeDoc = await model.find({
+            _id : {$in : ids},
+            status :true
+        }).select('_id')
+
+        if(activeDoc.length !== ids.length){
+            return null;
+        }
+        return activeDoc.map(doc => doc._id);
+    }
+    const validateStatus = await model.findById(ids).select('status');    
     if (!validateStatus || !validateStatus.status) {
         return null; // Return null for invalid/inactive
     }

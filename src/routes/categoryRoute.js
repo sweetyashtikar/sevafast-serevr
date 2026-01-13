@@ -5,13 +5,13 @@ const { pagination } = require("../middleware/pagination");
 const { authenticate, authorizePermission } = require("../middleware/authMiddleware");
 
 router
-  .route("/categories")
+  .route("/")
   .get(pagination, Category.getAllCategories)
   .post( authenticate,
          authorizePermission("can_manage_products"),Category.createCategory);
 
 router
-  .route("/categories/:id")
+  .route("/:id")
   .get(pagination, Category.getCategoryById)
   .put(Category.updateCategory)
   .put(Category.checkCategoryStatus)

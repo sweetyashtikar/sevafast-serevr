@@ -1,18 +1,44 @@
-const Product = require('../models/products');
-const { 
-  PRODUCT_TYPES, 
-  INDICATOR_TYPES, 
+const Product = require("../models/products");
+const {
+  PRODUCT_TYPES,
+  INDICATOR_TYPES,
   DELIVERABLE_TYPES,
   STOCK_STATUS,
-  STOCK_LEVEL_TYPES 
-} = require('../types/productTypes');
-const Category = require('../models/category');
-const { checkStatus ,toArray,toInt, toFloat,toBool} = require('../utils/sanitizer');
-const {  mapBasicInfo, mapCategorization, mapTaxPricing, mapInventory,mapProductType,mapShipping,mapDimensions, mapPolicies,mapMedia,mapDigitalProduct,addProductTypeData,
-    updateBasicInfo, updateCategorization,updateTaxPricing, updateInventory,updateShipping, updateDimensions,updatePolicies,updateMedia,updateDigitalProduct,updateProductTypeData } = require('../utils/productHelper');
-
-
-
+  STOCK_LEVEL_TYPES,
+} = require("../types/productTypes");
+const Category = require("../models/category");
+const Tax = require("../models/tax");
+const AttributeValue = require("../models/attributeValue");
+const {
+  checkStatus,
+  toArray,
+  toInt,
+  toFloat,
+  toBool,
+} = require("../utils/sanitizer");
+const {
+  mapBasicInfo,
+  mapCategorization,
+  mapTaxPricing,
+  mapInventory,
+  mapProductType,
+  mapShipping,
+  mapDimensions,
+  mapPolicies,
+  mapMedia,
+  mapDigitalProduct,
+  addProductTypeData,
+  updateBasicInfo,
+  updateCategorization,
+  updateTaxPricing,
+  updateInventory,
+  updateShipping,
+  updateDimensions,
+  updatePolicies,
+  updateMedia,
+  updateDigitalProduct,
+  updateProductTypeData,
+} = require("../utils/productHelper");
 
 // ==========================================
 // ADD PRODUCT
@@ -20,27 +46,30 @@ const {  mapBasicInfo, mapCategorization, mapTaxPricing, mapInventory,mapProduct
 
 const addProduct = async (req, res) => {
   try {
-   const body = req.body;
-    console.log("Add Product Request Body:", body);
-
+    const body = req.body;
 
     // Get vendor ID from authenticated user
     const vendorId = req.user._id;
 
     // const category = await Category.findById( categoryId);
-    const categoryId = await checkStatus(Category , body.categoryId)
-    console.log("categoryId", categoryId)
-    if (!categoryId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Category is inactive or invalid'
-      });
-    }
+      const [validateCategory, validateTax, validateAtrributeValue] = await Promise.all([
+          checkStatus(Category, body.categoryId),
+          checkStatus(Tax, body.taxId),
+          checkStatus(AttributeValue, body.attributeValues),
+        ]);
+      if (!validateCategory || !validateTax || !validateAtrributeValue) {
+        const missing = !validateCategory? "Category" : !validateTax? "Tax" : "Attribute Value";
 
+        return res.status(400).json({
+          success: false,
+          message: `${missing} is inactive or invalid.`,
+        });
+      }
+   
     const productData = {
       vendorId,
-      ...mapBasicInfo(body,categoryId),
-      ...mapCategorization(body, categoryId, toArray),
+      ...mapBasicInfo(body, validateCategory),
+      ...mapCategorization(body, validateCategory, toArray),
       ...mapTaxPricing(body, toBool),
       ...mapInventory(body, toInt),
       ...mapProductType(body),
@@ -49,9 +78,9 @@ const addProduct = async (req, res) => {
       ...mapPolicies(body, toBool),
       ...mapMedia(body),
       ...mapDigitalProduct(body, toBool),
-      status: body.status === undefined ? true : toBool(body.status)
+      status: body.status === undefined ? true : toBool(body.status),
     };
-    
+
     addProductTypeData(productData, body, toInt, toFloat, toArray);
 
     const product = new Product(productData);
@@ -59,16 +88,15 @@ const addProduct = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'Product added successfully',
-      data: { product }
+      message: "Product added successfully",
+      data: { product },
     });
-
   } catch (error) {
-    console.error('Add product error:', error);
+    console.error("Add product error:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to add product',
-      error: error.message
+      message: "Failed to add product",
+      error: error.message,
     });
   }
 };
@@ -87,13 +115,13 @@ const updateProduct = async (req, res) => {
     const product = await Product.findOne({
       _id: productId,
       vendorId,
-      isDeleted: false
+      isDeleted: false,
     });
 
     if (!product) {
       return res.status(404).json({
         success: false,
-        message: 'Product not found'
+        message: "Product not found",
       });
     }
 
@@ -105,7 +133,7 @@ const updateProduct = async (req, res) => {
       if (!categoryId) {
         return res.status(400).json({
           success: false,
-          message: 'Category is inactive or invalid'
+          message: "Category is inactive or invalid",
         });
       }
       product.categoryId = categoryId;
@@ -113,31 +141,31 @@ const updateProduct = async (req, res) => {
 
     // Update basic information
     updateBasicInfo(product, body);
-    
+
     // Update categorization
     updateCategorization(product, body, toArray, toInt);
-    
+
     // Update tax & pricing
     updateTaxPricing(product, body, toBool);
-    
+
     // Update inventory
     updateInventory(product, body, toInt);
-    
+
     // Update shipping
     updateShipping(product, body, toInt, toArray);
-    
+
     // Update dimensions
     updateDimensions(product, body, toFloat);
-    
+
     // Update policies
     updatePolicies(product, body, toBool);
-    
+
     // Update media
     updateMedia(product, body);
-    
+
     // Update digital product settings
     updateDigitalProduct(product, body, toBool);
-    
+
     // Update status
     if (isDefined(body.status)) {
       product.status = toBool(body.status);
@@ -150,16 +178,15 @@ const updateProduct = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Product updated successfully',
-      data: { product }
+      message: "Product updated successfully",
+      data: { product },
     });
-
   } catch (error) {
-    console.error('Update product error:', error);
+    console.error("Update product error:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to update product',
-      error: error.message
+      message: "Failed to update product",
+      error: error.message,
     });
   }
 };
@@ -177,22 +204,22 @@ const deleteProduct = async (req, res) => {
     const product = await Product.findOne({
       _id: productId,
       vendorId,
-      isDeleted: false
+      isDeleted: false,
     });
 
     if (!product) {
       return res.status(404).json({
         success: false,
-        message: 'Product not found'
+        message: "Product not found",
       });
     }
 
-   const categoryId = await checkStatus(Category , body.categoryId)
-    console.log("categoryId", categoryId)
+    const categoryId = await checkStatus(Category, body.categoryId);
+    console.log("categoryId", categoryId);
     if (!categoryId) {
       return res.status(400).json({
         success: false,
-        message: 'Category is inactive or invalid'
+        message: "Category is inactive or invalid",
       });
     }
 
@@ -204,15 +231,14 @@ const deleteProduct = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Product deleted successfully'
+      message: "Product deleted successfully",
     });
-
   } catch (error) {
-    console.error('Delete product error:', error);
+    console.error("Delete product error:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to delete product',
-      error: error.message
+      message: "Failed to delete product",
+      error: error.message,
     });
   }
 };
@@ -227,16 +253,16 @@ const getProduct = async (req, res) => {
 
     const product = await Product.findOne({
       _id: productId,
-      isDeleted: false
+      isDeleted: false,
     })
-    .populate('vendorId', 'fullName email businessName')
-    .populate('categoryId', 'name')
-    .populate('taxId', 'name rate');
+      .populate("vendorId", "fullName email businessName")
+      .populate("categoryId", "name")
+      .populate("taxId", "name rate");
 
     if (!product) {
       return res.status(404).json({
         success: false,
-        message: 'Product not found'
+        message: "Product not found",
       });
     }
 
@@ -245,15 +271,14 @@ const getProduct = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: { product }
+      data: { product },
     });
-
   } catch (error) {
-    console.error('Get product error:', error);
+    console.error("Get product error:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch product',
-      error: error.message
+      message: "Failed to fetch product",
+      error: error.message,
     });
   }
 };
@@ -275,16 +300,16 @@ const getAllProducts = async (req, res) => {
       brand,
       indicator,
       productType,
-      sortBy = 'createdAt',
-      sortOrder = 'desc',
-      inStock
+      sortBy = "createdAt",
+      sortOrder = "desc",
+      inStock,
     } = req.query;
 
     // Build query
     const query = {
       isDeleted: false,
       isActive: true,
-      isApproved: true
+      isApproved: true,
     };
 
     // Category filter
@@ -304,9 +329,9 @@ const getAllProducts = async (req, res) => {
 
     // Price range filter (for simple products)
     if (minPrice || maxPrice) {
-      query['simpleProduct.price'] = {};
-      if (minPrice) query['simpleProduct.price'].$gte = parseFloat(minPrice);
-      if (maxPrice) query['simpleProduct.price'].$lte = parseFloat(maxPrice);
+      query["simpleProduct.price"] = {};
+      if (minPrice) query["simpleProduct.price"].$gte = parseFloat(minPrice);
+      if (maxPrice) query["simpleProduct.price"].$lte = parseFloat(maxPrice);
     }
 
     // Brand filter
@@ -325,25 +350,25 @@ const getAllProducts = async (req, res) => {
     }
 
     // Stock filter
-    if (inStock === 'true') {
+    if (inStock === "true") {
       query.$or = [
-        { 'simpleProduct.stockStatus': STOCK_STATUS.IN_STOCK },
-        { 'productLevelStock.stockStatus': STOCK_STATUS.IN_STOCK },
-        { 'variants.stockStatus': STOCK_STATUS.IN_STOCK }
+        { "simpleProduct.stockStatus": STOCK_STATUS.IN_STOCK },
+        { "productLevelStock.stockStatus": STOCK_STATUS.IN_STOCK },
+        { "variants.stockStatus": STOCK_STATUS.IN_STOCK },
       ];
     }
 
     // Sorting
     const sort = {};
-    sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+    sort[sortBy] = sortOrder === "asc" ? 1 : -1;
 
     // Pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     // Execute query
     const products = await Product.find(query)
-      .populate('vendorId', 'fullName businessName')
-      .populate('categoryId', 'name')
+      .populate("vendorId", "fullName businessName")
+      .populate("categoryId", "name")
       .sort(sort)
       .skip(skip)
       .limit(parseInt(limit));
@@ -359,17 +384,16 @@ const getAllProducts = async (req, res) => {
           currentPage: parseInt(page),
           totalPages: Math.ceil(total / parseInt(limit)),
           totalProducts: total,
-          productsPerPage: parseInt(limit)
-        }
-      }
+          productsPerPage: parseInt(limit),
+        },
+      },
     });
-
   } catch (error) {
-    console.error('Get all products error:', error);
+    console.error("Get all products error:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch products',
-      error: error.message
+      message: "Failed to fetch products",
+      error: error.message,
     });
   }
 };
@@ -387,11 +411,11 @@ const getVendorProducts = async (req, res) => {
     const query = {
       ...searchQuery,
       vendorId,
-      isDeleted: false
+      isDeleted: false,
     };
 
     if (filters.status !== undefined) {
-      query.isActive = filters.status === 'active';
+      query.isActive = filters.status === "active";
     }
 
     if (filters.productType) {
@@ -400,7 +424,7 @@ const getVendorProducts = async (req, res) => {
 
     // Execute query
     const products = await Product.find(query)
-      .populate('categoryId', 'name')
+      .populate("categoryId", "name")
       .sort(sort)
       .skip(skip)
       .limit(parseInt(limit));
@@ -408,33 +432,32 @@ const getVendorProducts = async (req, res) => {
     const total = await Product.countDocuments(query);
 
     // Calculate stats
-   const [totalItems, active, inactive, pending] = await Promise.all([
+    const [totalItems, active, inactive, pending] = await Promise.all([
       Product.countDocuments({ vendorId, isDeleted: false }),
       Product.countDocuments({ vendorId, isActive: true, isDeleted: false }),
       Product.countDocuments({ vendorId, isActive: false, isDeleted: false }),
-      Product.countDocuments({ vendorId, isApproved: false, isDeleted: false })
+      Product.countDocuments({ vendorId, isApproved: false, isDeleted: false }),
     ]);
 
     res.status(200).json({
       success: true,
       data: {
         products,
-       stats: { total: totalItems, active, inactive, pending },
-       pagination: {
+        stats: { total: totalItems, active, inactive, pending },
+        pagination: {
           totalRecords: total,
           limit,
           offset,
-          totalPages: Math.ceil(total / limit)
-        }
-      }
+          totalPages: Math.ceil(total / limit),
+        },
+      },
     });
-
   } catch (error) {
-    console.error('Get vendor products error:', error);
+    console.error("Get vendor products error:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch vendor products',
-      error: error.message
+      message: "Failed to fetch vendor products",
+      error: error.message,
     });
   }
 };
@@ -446,28 +469,33 @@ const getVendorProducts = async (req, res) => {
 const getProductsByCategory = async (req, res) => {
   try {
     const { categoryId } = req.params;
-    const { page = 1, limit = 20, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
+    const {
+      page = 1,
+      limit = 20,
+      sortBy = "createdAt",
+      sortOrder = "desc",
+    } = req.query;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const sort = {};
-    sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+    sort[sortBy] = sortOrder === "asc" ? 1 : -1;
 
     const products = await Product.find({
       categoryId,
       isDeleted: false,
       isActive: true,
-      isApproved: true
+      isApproved: true,
     })
-    .populate('vendorId', 'fullName businessName')
-    .sort(sort)
-    .skip(skip)
-    .limit(parseInt(limit));
+      .populate("vendorId", "fullName businessName")
+      .sort(sort)
+      .skip(skip)
+      .limit(parseInt(limit));
 
     const total = await Product.countDocuments({
       categoryId,
       isDeleted: false,
       isActive: true,
-      isApproved: true
+      isApproved: true,
     });
 
     res.status(200).json({
@@ -477,17 +505,16 @@ const getProductsByCategory = async (req, res) => {
         pagination: {
           currentPage: parseInt(page),
           totalPages: Math.ceil(total / parseInt(limit)),
-          totalProducts: total
-        }
-      }
+          totalProducts: total,
+        },
+      },
     });
-
   } catch (error) {
-    console.error('Get products by category error:', error);
+    console.error("Get products by category error:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch products',
-      error: error.message
+      message: "Failed to fetch products",
+      error: error.message,
     });
   }
 };
@@ -503,7 +530,7 @@ const searchProducts = async (req, res) => {
     if (!query) {
       return res.status(400).json({
         success: false,
-        message: 'Search query is required'
+        message: "Search query is required",
       });
     }
 
@@ -513,18 +540,18 @@ const searchProducts = async (req, res) => {
       $text: { $search: query },
       isDeleted: false,
       isActive: true,
-      isApproved: true
+      isApproved: true,
     })
-    .populate('vendorId', 'fullName businessName')
-    .populate('categoryId', 'name')
-    .skip(skip)
-    .limit(parseInt(limit));
+      .populate("vendorId", "fullName businessName")
+      .populate("categoryId", "name")
+      .skip(skip)
+      .limit(parseInt(limit));
 
     const total = await Product.countDocuments({
       $text: { $search: query },
       isDeleted: false,
       isActive: true,
-      isApproved: true
+      isApproved: true,
     });
 
     res.status(200).json({
@@ -535,17 +562,16 @@ const searchProducts = async (req, res) => {
         pagination: {
           currentPage: parseInt(page),
           totalPages: Math.ceil(total / parseInt(limit)),
-          totalResults: total
-        }
-      }
+          totalResults: total,
+        },
+      },
     });
-
   } catch (error) {
-    console.error('Search products error:', error);
+    console.error("Search products error:", error);
     res.status(500).json({
       success: false,
-      message: 'Search failed',
-      error: error.message
+      message: "Search failed",
+      error: error.message,
     });
   }
 };
@@ -563,13 +589,13 @@ const updateProductStatus = async (req, res) => {
     const product = await Product.findOne({
       _id: productId,
       vendorId,
-      isDeleted: false
+      isDeleted: false,
     });
 
     if (!product) {
       return res.status(404).json({
         success: false,
-        message: 'Product not found'
+        message: "Product not found",
       });
     }
 
@@ -578,16 +604,17 @@ const updateProductStatus = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: `Product ${product.isActive ? 'activated' : 'deactivated'} successfully`,
-      data: { product }
+      message: `Product ${
+        product.isActive ? "activated" : "deactivated"
+      } successfully`,
+      data: { product },
     });
-
   } catch (error) {
-    console.error('Update product status error:', error);
+    console.error("Update product status error:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to update product status',
-      error: error.message
+      message: "Failed to update product status",
+      error: error.message,
     });
   }
 };
@@ -605,35 +632,41 @@ const updateProductStock = async (req, res) => {
     const product = await Product.findOne({
       _id: productId,
       vendorId,
-      isDeleted: false
+      isDeleted: false,
     });
 
     if (!product) {
       return res.status(404).json({
         success: false,
-        message: 'Product not found'
+        message: "Product not found",
       });
     }
 
     // Update simple product stock
     if (product.productType === PRODUCT_TYPES.SIMPLE) {
       product.simpleProduct.totalStock = parseInt(stock);
-      product.simpleProduct.stockStatus = parseInt(stock) > 0 ? 
-        STOCK_STATUS.IN_STOCK : STOCK_STATUS.OUT_OF_STOCK;
+      product.simpleProduct.stockStatus =
+        parseInt(stock) > 0 ? STOCK_STATUS.IN_STOCK : STOCK_STATUS.OUT_OF_STOCK;
     }
 
     // Update variable product stock
     if (product.productType === PRODUCT_TYPES.VARIABLE) {
       if (product.variantStockLevelType === STOCK_LEVEL_TYPES.PRODUCT_LEVEL) {
         product.productLevelStock.totalStock = parseInt(stock);
-        product.productLevelStock.stockStatus = parseInt(stock) > 0 ? 
-          STOCK_STATUS.IN_STOCK : STOCK_STATUS.OUT_OF_STOCK;
+        product.productLevelStock.stockStatus =
+          parseInt(stock) > 0
+            ? STOCK_STATUS.IN_STOCK
+            : STOCK_STATUS.OUT_OF_STOCK;
       } else {
-        const variant = product.variants.find(v => v.variantIds === variantIds);
+        const variant = product.variants.find(
+          (v) => v.variantIds === variantIds
+        );
         if (variant) {
           variant.totalStock = parseInt(stock);
-          variant.stockStatus = parseInt(stock) > 0 ? 
-            STOCK_STATUS.IN_STOCK : STOCK_STATUS.OUT_OF_STOCK;
+          variant.stockStatus =
+            parseInt(stock) > 0
+              ? STOCK_STATUS.IN_STOCK
+              : STOCK_STATUS.OUT_OF_STOCK;
         }
       }
     }
@@ -642,16 +675,15 @@ const updateProductStock = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Stock updated successfully',
-      data: { product }
+      message: "Stock updated successfully",
+      data: { product },
     });
-
   } catch (error) {
-    console.error('Update stock error:', error);
+    console.error("Update stock error:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to update stock',
-      error: error.message
+      message: "Failed to update stock",
+      error: error.message,
     });
   }
 };
@@ -668,20 +700,20 @@ const checkDelivery = async (req, res) => {
     if (!zipcode) {
       return res.status(400).json({
         success: false,
-        message: 'Zipcode is required'
+        message: "Zipcode is required",
       });
     }
 
     const product = await Product.findOne({
       _id: productId,
       isDeleted: false,
-      isActive: true
+      isActive: true,
     });
 
     if (!product) {
       return res.status(404).json({
         success: false,
-        message: 'Product not found'
+        message: "Product not found",
       });
     }
 
@@ -694,16 +726,15 @@ const checkDelivery = async (req, res) => {
         zipcode,
         canDeliver,
         deliveryType: product.deliverableType,
-        codAllowed: product.codAllowed
-      }
+        codAllowed: product.codAllowed,
+      },
     });
-
   } catch (error) {
-    console.error('Check delivery error:', error);
+    console.error("Check delivery error:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to check delivery availability',
-      error: error.message
+      message: "Failed to check delivery availability",
+      error: error.message,
     });
   }
 };
@@ -720,24 +751,23 @@ const getFeaturedProducts = async (req, res) => {
     const products = await Product.find({
       isDeleted: false,
       isActive: true,
-      isApproved: true
+      isApproved: true,
     })
-    .populate('vendorId', 'fullName businessName')
-    .populate('categoryId', 'name')
-    .sort({ totalSales: -1, 'rating.average': -1 })
-    .limit(parseInt(limit));
+      .populate("vendorId", "fullName businessName")
+      .populate("categoryId", "name")
+      .sort({ totalSales: -1, "rating.average": -1 })
+      .limit(parseInt(limit));
 
     res.status(200).json({
       success: true,
-      data: { products }
+      data: { products },
     });
-
   } catch (error) {
-    console.error('Get featured products error:', error);
+    console.error("Get featured products error:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch featured products',
-      error: error.message
+      message: "Failed to fetch featured products",
+      error: error.message,
     });
   }
 };
@@ -756,7 +786,7 @@ const getRelatedProducts = async (req, res) => {
     if (!product) {
       return res.status(404).json({
         success: false,
-        message: 'Product not found'
+        message: "Product not found",
       });
     }
 
@@ -766,25 +796,29 @@ const getRelatedProducts = async (req, res) => {
       categoryId: product.categoryId,
       isDeleted: false,
       isActive: true,
-      isApproved: true
+      isApproved: true,
     })
-    .populate('vendorId', 'fullName businessName')
-    .limit(parseInt(limit));
+      .populate("vendorId", "fullName businessName")
+      .limit(parseInt(limit));
 
     res.status(200).json({
       success: true,
-      data: { relatedProducts }
+      data: { relatedProducts },
     });
-
   } catch (error) {
-    console.error('Get related products error:', error);
+    console.error("Get related products error:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch related products',
-      error: error.message
+      message: "Failed to fetch related products",
+      error: error.message,
     });
   }
 };
+
+const approveProduct = async(req, res)=>{
+  
+
+}
 
 module.exports = {
   addProduct,
@@ -799,5 +833,6 @@ module.exports = {
   updateProductStock,
   checkDelivery,
   getFeaturedProducts,
-  getRelatedProducts
+  getRelatedProducts,
+  approveProduct
 };
