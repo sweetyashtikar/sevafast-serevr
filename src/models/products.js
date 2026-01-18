@@ -13,44 +13,44 @@ const {
 // Variant sub-schema for variable products
 const variantSchema = new mongoose.Schema(
   {
-    // Variant identification
-    variantIds: {
-      type: String,
-      required: true,
-      trim: true,
-      // Example: "3 5" means attribute_value_id 3 and 5
-      // Like "Size: Large (id=3)" + "Color: Red (id=5)"
-    },
+    // // Variant identification
+    // variantIds: {
+    //   type: String,
+    //   required: true,
+    //   trim: true,
+    //   // Example: "3 5" means attribute_value_id 3 and 5
+    //   // Like "Size: Large (id=3)" + "Color: Red (id=5)"
+    // },
 
     // Pricing
-    price: {
+    variant_price: {
       type: Number,
       required: true,
       min: 0,
     },
-    specialPrice: {
+    variant_specialPrice: {
       type: Number,
       min: 0,
       validate: {
         validator: function (value) {
-          return !value || value < this.price;
+          return !value || value < this.variant_price;
         },
-        message: "Special price must be less than regular price",
+        message: "Variant Special price must be less than regular price",
       },
     },
 
     // Stock management (when variant_stock_level_type = 'variable_level')
-    sku: {
+    variant_sku: {
       type: String,
       trim: true,
       uppercase: true,
     },
-    totalStock: {
+    variant_totalStock: {
       type: Number,
       min: 0,
       default: 0,
     },
-    stockStatus: {
+    variant_stockStatus: {
       type: String,
       enum: [STOCK_STATUS.IN_STOCK, STOCK_STATUS.OUT_OF_STOCK],
       default: STOCK_STATUS.IN_STOCK,
@@ -58,13 +58,13 @@ const variantSchema = new mongoose.Schema(
     
 
     // Dimensions (optional per variant)
-    weight: { type: Number, min: 0 },
-    height: { type: Number, min: 0 },
-    breadth: { type: Number, min: 0 },
-    length: { type: Number, min: 0 },
+    variant_weight: { type: Number, min: 0 },
+    variant_height: { type: Number, min: 0 },
+    variant_breadth: { type: Number, min: 0 },
+    variant_length: { type: Number, min: 0 },
 
     // Media
-    images: [
+    variant_images: [
       {
         type: String,
         trim: true,
@@ -72,7 +72,7 @@ const variantSchema = new mongoose.Schema(
     ],
 
     // Status
-    isActive: {
+    variant_isActive: {
       type: Boolean,
       default: true,
     },
@@ -100,6 +100,7 @@ const productSchema = new mongoose.Schema(
       trim: true,
       minlength: [3, "Product name must be at least 3 characters"],
       maxlength: [200, "Product name cannot exceed 200 characters"],
+      unique:true
     },
 
     slug: {
@@ -107,7 +108,6 @@ const productSchema = new mongoose.Schema(
       unique: true,
       lowercase: true,
       trim: true,
-      index: true,
     },
 
     shortDescription: {
@@ -148,7 +148,6 @@ const productSchema = new mongoose.Schema(
     brand: {
       type: String,
       trim: true,
-      index: true,
     },
 
     hsnCode: {
@@ -240,7 +239,7 @@ const productSchema = new mongoose.Schema(
     // ==========================================
 
     simpleProduct: {
-      price: {
+      sp_price: {
         type: Number,
         min: 0,
         required: function () {
@@ -251,33 +250,33 @@ const productSchema = new mongoose.Schema(
         },
       },
 
-      specialPrice: {
+      sp_specialPrice: {
         type: Number,
         min: 0,
         validate: {
           validator: function (value) {
-            return !value || value < this.simpleProduct.price;
+            return !value || value < this.simpleProduct.sp_price;
           },
-          message: "Special price must be less than regular price",
+          message: "Simple Product Special price must be less than regular price",
         },
       },
 
-      sku: {
+      sp_sku: {
         type: String,
         trim: true,
         uppercase: true,
       },
 
-      totalStock: {
+      sp_totalStock: {
         type: Number,
         min: 0,
         default: 0,
       },
 
-    stockStatus: {
+    sp_stockStatus : {
       type: String,
       enum: [STOCK_STATUS.IN_STOCK, STOCK_STATUS.OUT_OF_STOCK],
-      default: STOCK_STATUS.IN_STOCK,
+      default: STOCK_STATUS.NULL,
     },
     },
 
@@ -300,21 +299,21 @@ const productSchema = new mongoose.Schema(
 
     // Product-level stock (when variant_stock_level_type = 'product_level')
     productLevelStock: {
-      sku: {
+      pls_sku: {
         type: String,
         trim: true,
         uppercase: true,
       },
-      totalStock: {
+      pls_totalStock: {
         type: Number,
         min: 0,
         default: 0,
       },
-    stockStatus: {
-      type: String,
-      enum: [STOCK_STATUS.IN_STOCK, STOCK_STATUS.OUT_OF_STOCK],
-      default: STOCK_STATUS.IN_STOCK,
-    },
+      pls_stockStatus: {
+        type: String,
+        enum: [STOCK_STATUS.IN_STOCK, STOCK_STATUS.OUT_OF_STOCK],
+        default: STOCK_STATUS.NULL,
+      },
     },
 
     // ==========================================
@@ -353,23 +352,23 @@ const productSchema = new mongoose.Schema(
 
     codAllowed: {
       type: Boolean,
-      default: true,
+      default: false,
     },
 
     isReturnable: {
       type: Boolean,
-      default: true,
+      default: false,
     },
 
     isCancelable: {
       type: Boolean,
-      default: true,
+      default: false,
     },
 
     cancelableTill: {
       type: String,
       enum: Object.values(CANCELABLE_STAGES),
-      default: CANCELABLE_STAGES.RECEIVED,
+      default: CANCELABLE_STAGES.NOT_RETURNABLE,
     },
 
     warrantyPeriod: {
@@ -400,7 +399,7 @@ const productSchema = new mongoose.Schema(
     ],
 
     video: {
-      type: {
+      videoType: {
         type: String,
         enum: Object.values(VIDEO_TYPES),
       },
@@ -413,7 +412,6 @@ const productSchema = new mongoose.Schema(
         trim: true,
       },
     },
-
     // ==========================================
     // DIGITAL PRODUCT SPECIFICS
     // ==========================================
@@ -458,7 +456,7 @@ const productSchema = new mongoose.Schema(
 
     approvedBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "admin",
+      ref: "User",
     },
 
     approvedAt: {
@@ -546,14 +544,14 @@ const productSchema = new mongoose.Schema(
 // INDEXES
 // ==========================================
 
-productSchema.index({ vendorId: 1, isActive: 1 });
-productSchema.index({ categoryId: 1, isActive: 1 });
-productSchema.index({ name: "text", shortDescription: "text", tags: "text" });
-productSchema.index({ "simpleProduct.price": 1 });
-productSchema.index({ brand: 1 });
+productSchema.index({ vendorId: 1 });
+productSchema.index({ categoryId: 1, status: 1 });
+productSchema.index({ name: "text", tags: "text" });
+// productSchema.index({ "simpleProduct.price": 1 });
+// productSchema.index({ brand: 1 });
 productSchema.index({ createdAt: -1 });
-productSchema.index({ totalSales: -1 });
-productSchema.index({ "rating.average": -1 });
+// productSchema.index({ totalSales: -1 });
+// productSchema.index({ "rating.average": -1 });
 
 // ==========================================
 // VIRTUAL FIELDS
@@ -565,7 +563,7 @@ productSchema.virtual("effectivePrice").get(function () {
     this.productType === PRODUCT_TYPES.SIMPLE ||
     this.productType === PRODUCT_TYPES.DIGITAL
   ) {
-    return this.simpleProduct.specialPrice || this.simpleProduct.price;
+    return this.simpleProduct.sp_specialPrice || this.simpleProduct.sp_price;
   }
   return null;
 });
@@ -576,10 +574,10 @@ productSchema.virtual("discountPercentage").get(function () {
     this.productType === PRODUCT_TYPES.SIMPLE ||
     this.productType === PRODUCT_TYPES.DIGITAL
   ) {
-    if (this.simpleProduct.specialPrice && this.simpleProduct.price) {
+    if (this.simpleProduct.sp_specialPrice && this.simpleProduct.sp_price) {
       const discount =
-        ((this.simpleProduct.price - this.simpleProduct.specialPrice) /
-          this.simpleProduct.price) *
+        ((this.simpleProduct.sp_price - this.simpleProduct.sp_specialPrice) /
+          this.simpleProduct.sp_price) *
         100;
       return Math.round(discount);
     }
@@ -590,18 +588,16 @@ productSchema.virtual("discountPercentage").get(function () {
 // Check if product is in stock
 productSchema.virtual("inStock").get(function () {
   if (this.productType === PRODUCT_TYPES.SIMPLE) {
-    return this.simpleProduct.stockStatus === STOCK_STATUS.IN_STOCK;
+    return this.simpleProduct.sp_stockStatus === STOCK_STATUS.IN_STOCK;
   }
   if (this.productType === PRODUCT_TYPES.VARIABLE) {
-    if (
-      this.variantStockLevelType === VARIANT_STOCK_LEVEL_TYPES.PRODUCT_LEVEL
-    ) {
-      return this.productLevelStock.stockStatus === STOCK_STATUS.IN_STOCK;
+    if (this.variantStockLevelType === VARIANT_STOCK_LEVEL_TYPES.PRODUCT_LEVEL) {
+      return this.productLevelStock.pls_stockStatus === STOCK_STATUS.IN_STOCK;
     }
     // Check if any variant is in stock
     return this.variants.some((v) => v.stockStatus === STOCK_STATUS.IN_STOCK);
   }
-  return true; // Digital products always "in stock"
+  return false; // Digital products always "in stock"
 });
 
 // ==========================================
@@ -612,9 +608,7 @@ productSchema.virtual("inStock").get(function () {
 productSchema.pre("save", function (next) {
   if (this.isModified("name") && !this.slug) {
     this.slug = this.name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "");
+      .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
     // Add random suffix to ensure uniqueness
     this.slug += `-${Date.now().toString(36)}`;
@@ -641,21 +635,11 @@ productSchema.pre("save", function (next) {
 // Validate digital product requirements
 productSchema.pre("save", function (next) {
   if (this.productType === PRODUCT_TYPES.DIGITAL) {
-    if (
-      this.downloadLinkType === DOWNLOAD_LINK_TYPES.SELF_HOSTED &&
-      !this.downloadFile
-    ) {
-      return next(
-        new Error("Download file is required for self-hosted digital products")
-      );
+    if (this.downloadLinkType === DOWNLOAD_LINK_TYPES.SELF_HOSTED && !this.downloadFile) {
+      return next(new Error("Download file is required for self-hosted digital products"));
     }
-    if (
-      this.downloadLinkType === DOWNLOAD_LINK_TYPES.ADD_LINK &&
-      !this.downloadLink
-    ) {
-      return next(
-        new Error("Download link is required for linked digital products")
-      );
+    if (this.downloadLinkType === DOWNLOAD_LINK_TYPES.ADD_LINK && !this.downloadLink) {
+      return next(new Error("Download link is required for linked digital products"));
     }
   }
   // next();
@@ -689,9 +673,9 @@ productSchema.methods.getVariantByIds = function (variantIds) {
 // Update stock for simple product
 productSchema.methods.updateStock = function (quantity) {
   if (this.productType === PRODUCT_TYPES.SIMPLE) {
-    this.simpleProduct.totalStock -= quantity;
-    if (this.simpleProduct.totalStock <= 0) {
-      this.simpleProduct.stockStatus = STOCK_STATUS.OUT_OF_STOCK;
+    this.simpleProduct.sp_totalStock -= quantity;
+    if (this.simpleProduct.sp_totalStock <= 0) {
+      this.simpleProduct.sp_stockStatus  = STOCK_STATUS.OUT_OF_STOCK;
     }
   }
 };
@@ -704,15 +688,15 @@ productSchema.methods.updateVariantStock = function (variantIds, quantity) {
     ) {
       const variant = this.getVariantByIds(variantIds);
       if (variant) {
-        variant.totalStock -= quantity;
-        if (variant.totalStock <= 0) {
-          variant.stockStatus = STOCK_STATUS.OUT_OF_STOCK;
+        variant.variant_totalStock  -= quantity;
+        if (variant.variant_totalStock  <= 0) {
+          variant.variant_stockStatus  = STOCK_STATUS.OUT_OF_STOCK;
         }
       }
     } else {
-      this.productLevelStock.totalStock -= quantity;
-      if (this.productLevelStock.totalStock <= 0) {
-        this.productLevelStock.stockStatus = STOCK_STATUS.OUT_OF_STOCK;
+      this.productLevelStock.pls_totalStock  -= quantity;
+      if (this.productLevelStock.pls_totalStock  <= 0) {
+        this.productLevelStock.pls_stockStatus  = STOCK_STATUS.OUT_OF_STOCK;
       }
     }
   }
@@ -724,6 +708,16 @@ productSchema.methods.incrementViews = function () {
   return this.save();
 };
 
+// Validate special price in variant schema (FIXED)
+variantSchema.path('variant_specialPrice').validate(function (value) {
+  return !value || value < this.variant_price;
+}, "Variant Special price must be less than regular price");
+
+// Validate special price in simple product (FIXED)
+productSchema.path('simpleProduct.sp_specialPrice').validate(function (value) {
+  return !value || value < this.simpleProduct.sp_price;
+}, "Product Special price must be less than regular price");
+
 // ==========================================
 // STATIC METHODS
 // ==========================================
@@ -731,7 +725,7 @@ productSchema.methods.incrementViews = function () {
 // Find active products
 productSchema.statics.findActive = function () {
   return this.find({
-    isActive: true,
+    status: true,
     isDeleted: false,
     isApproved: true,
   });
@@ -741,7 +735,7 @@ productSchema.statics.findActive = function () {
 productSchema.statics.searchProducts = function (query) {
   return this.find({
     $text: { $search: query },
-    isActive: true,
+    status: true,
     isDeleted: false,
   });
 };
@@ -750,7 +744,7 @@ productSchema.statics.searchProducts = function (query) {
 productSchema.statics.findByCategory = function (categoryId) {
   return this.find({
     categoryId,
-    isActive: true,
+    status: true,
     isDeleted: false,
     isApproved: true,
   });

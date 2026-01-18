@@ -21,12 +21,14 @@ const DELIVERABLE_TYPES = {
 const STOCK_STATUS = {
   IN_STOCK: "in-stock",
   OUT_OF_STOCK: "out-of-stock",
+  NULL : null
 };
 
 const CANCELABLE_STAGES = {
   RECEIVED: "received",
   PROCESSED: "processed",
   SHIPPED: "shipped",
+  NOT_RETURNABLE :"non returnable"
 };
 
 const VIDEO_TYPES = {

@@ -44,6 +44,6 @@ const themeSchema = new mongoose.Schema({
 
 // Index to quickly find the active/default theme
 themeSchema.index({ is_default: 1 });
-themeSchema.index({ slug: 1 });
+// themeSchema.index({ slug: 1 });
 
 module.exports = mongoose.model('Theme', themeSchema);

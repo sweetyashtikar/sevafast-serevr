@@ -29,11 +29,23 @@ const createTax = async (req, res) => {
 
 // READ: Get all taxes (with optional status filtering)
 const getAllTaxes = async (req, res) => {
+    const { limit, offset, sort, searchQuery, filters } = req.paginationQuery;
+    const finalQuery = { ...searchQuery, ...filters };
+
   try {
-    const taxes = await Tax.find(filter).sort({ createdAt: -1 });
+    const taxes = await Tax.find(finalQuery)
+    .sort(sort)
+    .skip(offset)
+    .limit(limit);
+
+     const total = await Tax.countDocuments(finalQuery);
+    
 
     res.status(200).json({
       success: true,
+      total,
+      limit,
+      offset,
       count: taxes.length,
       data: taxes
     });

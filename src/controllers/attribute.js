@@ -12,7 +12,10 @@ const createAttribute = async (req, res) => {
         .status(400)
         .json({ success: false, message: "Name already exists" });
 
-    const checkStatusAttributeSet = await checkStatus( AttributeSet, attribute_set_id );
+    const checkStatusAttributeSet = await checkStatus(
+      AttributeSet,
+      attribute_set_id
+    );
     if (!checkStatusAttributeSet) {
       return res.status(400).json({
         success: false,
@@ -43,43 +46,37 @@ const createAttribute = async (req, res) => {
 };
 
 const getAllAttributes = async (req, res) => {
+  const { limit, offset, sort, searchQuery, filters } = req.paginationQuery;
+  console.log(req.paginationQuery)
+  const finalQuery = { ...searchQuery, ...filters };
   try {
-    const attributes = await Attribute.find()
+    const attributes = await Attribute.find(finalQuery)
       .populate("attribute_set_id", "name status") // Join with AttributeSet to get the name
-      .sort({ createdAt: -1 });
+      .sort(sort)
+      .skip(offset)
+      .limit(limit);
 
-    res
-      .status(200)
-      .json({ success: true, count: attributes.length, data: attributes });
+    const total = await Attribute.countDocuments(finalQuery);
+
+    res.status(200)
+      .json({
+        success: true,
+        total,
+        limit,
+        offset,
+        count: attributes.length,
+        data: attributes,
+      });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// GET ALL (With optional filtering by Set)
-const getAttributeByAttributeSetID = async (req, res) => {
-  try {
-    const { attribute_set_id } = req.query;
-    let query = {};
 
-    // If a set ID is passed in query params: /api/attributes?attribute_set_id=...
-    if (attribute_set_id) query.attribute_set_id = attribute_set_id;
-
-    const attributes = await Attribute.find(query)
-      .populate("attribute_set_id", "name") // Join with AttributeSet to get the name
-      .sort({ createdAt: -1 });
-
-    res
-      .status(200)
-      .json({ success: true, count: attributes.length, data: attributes });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
 
 // GET SINGLE
 const getAttributeById = async (req, res) => {
-    const id = req.params.id
+  const id = req.params.id;
   try {
     const attribute = await Attribute.findById(id).populate(
       "attribute_set_id",
@@ -101,13 +98,16 @@ const updateAttribute = async (req, res) => {
   const id = req.params.id;
   const { attribute_set_id, name, type, status } = req.body;
 
-   const checkStatusAttributeSet = await checkStatus( AttributeSet, attribute_set_id );
-    if (!checkStatusAttributeSet) {
-      return res.status(400).json({
-        success: false,
-        message: "Attribute Set is Inactive",
-      });
-    }
+  const checkStatusAttributeSet = await checkStatus(
+    AttributeSet,
+    attribute_set_id
+  );
+  if (!checkStatusAttributeSet) {
+    return res.status(400).json({
+      success: false,
+      message: "Attribute Set is Inactive",
+    });
+  }
   try {
     const attribute = await Attribute.findByIdAndUpdate(
       id,
@@ -137,7 +137,7 @@ const updateAttribute = async (req, res) => {
 
 // DELETE
 const deleteAttribute = async (req, res) => {
-    const id = req.params.id
+  const id = req.params.id;
   try {
     const attribute = await Attribute.findByIdAndDelete(id);
     if (!attribute)
@@ -157,7 +157,6 @@ module.exports = {
   deleteAttribute,
   updateAttribute,
   createAttribute,
-  getAttributeByAttributeSetID,
   getAttributeById,
   getAllAttributes,
 };

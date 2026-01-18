@@ -80,6 +80,6 @@ const sellerSchema = new mongoose.Schema({
 });
 
 // Indexing for faster store searches
-sellerSchema.index({ "store_info.name": "text", slug: 1 });
+sellerSchema.index({ "store_info.name": "text" });
 
 module.exports = mongoose.model('Seller', sellerSchema);

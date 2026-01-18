@@ -49,18 +49,23 @@ const createAttributeValue = async (req, res) => {
 
 // GET ALL: Can be filtered by attribute_id
 const getAllAttributeValues = async (req, res) => {
+     const { limit, offset, sort, searchQuery, filters } = req.paginationQuery;
+    const finalQuery = { ...searchQuery, ...filters };
+
   try {
-    const { attribute_id } = req.query;
-    let filter = {};
-
-    if (attribute_id) filter.attribute_id = attribute_id;
-
-    const values = await AttributeValue.find(filter)
+    const values = await AttributeValue.find(finalQuery)
       .populate("attribute_id", "name type status")
-      .sort({ value: 1 }); // Sort alphabetically
+      .sort(sort)
+      .skip(offset)
+      .limit(limit); 
+
+      const total = await AttributeValue.countDocuments(finalQuery);
 
     res.status(200).json({
       success: true,
+      total,
+      limit,
+      offset,
       count: values.length,
       data: values,
     });
@@ -70,7 +75,7 @@ const getAllAttributeValues = async (req, res) => {
 };
 
 // GET ALL (With optional filtering by Set) recheck the code
-const getAttributeByAttributeSetID = async (req, res) => {
+const getAttributeByAttributeID = async (req, res) => {
   try {
     const { attribute_id } = req.query;
     let query = {};
@@ -96,7 +101,7 @@ const getAttributeValueById = async (req, res) => {
   try {
     const attribute = await Attribute.findById(id).populate(
       "attribute_id",
-      "name status"
+      "name  type status"
     );
     if (!attribute)
       return res
@@ -181,4 +186,5 @@ module.exports = {
   getAllAttributeValues,
   updateAttributeValue,
   deleteAttributeValue,
+  getAttributeValueById
 };

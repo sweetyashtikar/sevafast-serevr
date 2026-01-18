@@ -5,6 +5,7 @@ const {
   authenticate,
   authorizePermission,
   optionalAuth,
+  checkIfAdmin
 } = require("../middleware/authMiddleware");
 const { pagination } = require("../middleware/pagination");
 
@@ -144,6 +145,13 @@ router.patch(
   authenticate,
   authorizePermission("can_manage_products"),
   productController.updateProductStock
+);
+
+router.patch(
+  "/:id",
+  authenticate,
+  checkIfAdmin,
+  productController.approveProduct
 );
 
 module.exports = router;

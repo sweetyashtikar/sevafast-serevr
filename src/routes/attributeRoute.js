@@ -4,7 +4,6 @@ const {
     deleteAttribute,
     updateAttribute,
     createAttribute,
-    getAttributeByAttributeSetID,
     getAttributeById,
     getAllAttributes
 } = require("../controllers/attribute");
@@ -13,14 +12,14 @@ const {
   authorizePermission,
   optionalAuth,
 } = require("../middleware/authMiddleware");
+const {pagination} = require('../middleware/pagination')
 
 router.route("/")
     .post( authenticate,authorizePermission("can_manage_products"),createAttribute)
-    .get(getAllAttributes);
+    .get(pagination,getAllAttributes);
 
 router.route("/:id")
     .get(getAttributeById)
-    .get(getAttributeByAttributeSetID)
     .put( authenticate,authorizePermission("can_manage_products"),updateAttribute)
     .delete( authenticate,authorizePermission("can_manage_products"),deleteAttribute);
 

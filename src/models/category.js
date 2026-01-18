@@ -42,7 +42,13 @@ const categorySchema = new mongoose.Schema({
 });
 
 // Create an index for faster searching by slug
-categorySchema.index({ slug: 1 });
+categorySchema.index({ name: 1 });
+
+// Increment views
+categorySchema.methods.incrementClicks = function () {
+  this.clicks += 1;
+  return this.save();
+};
 
 const Category = mongoose.model('Category', categorySchema);
 

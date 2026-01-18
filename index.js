@@ -3,6 +3,8 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 const { MONGODB_URI } = require('./src/env-variables');
 
+const { authenticate,authorizePermission} = require('./src/middleware/authMiddleware')
+
 
 
 
@@ -19,6 +21,7 @@ const attributeSetRoute = require('./src/routes/attributeSet')
 const attributeRoute = require('./src/routes/attributeRoute')
 const attributeValueRoute = require("./src/routes/attributeValue")
 const taxRoute = require('./src/routes/taxRoute')
+const StatusRoute = require('./src/controllers/status')
 
 
 
@@ -38,6 +41,7 @@ connection.once('open', () => {
 
 /* Routes */
 app.set('trust proxy', true);
+app.use('/api/updateStatus',authenticate,authorizePermission("can_manage_products"),StatusRoute)
 app.use('/api', userRoute);
 app.use('/api', authRoute);
 app.use('/api/role', roleRoute);

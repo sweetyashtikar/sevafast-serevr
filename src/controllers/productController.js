@@ -10,11 +10,7 @@ const Category = require("../models/category");
 const Tax = require("../models/tax");
 const AttributeValue = require("../models/attributeValue");
 const {
-  checkStatus,
-  toArray,
-  toInt,
-  toFloat,
-  toBool,
+  checkStatus
 } = require("../utils/sanitizer");
 const {
   mapBasicInfo,
@@ -26,6 +22,7 @@ const {
   mapDimensions,
   mapPolicies,
   mapMedia,
+  mapSEO,
   mapDigitalProduct,
   addProductTypeData,
   updateBasicInfo,
@@ -38,6 +35,11 @@ const {
   updateMedia,
   updateDigitalProduct,
   updateProductTypeData,
+  toBool,
+  toFloat,
+  toInt,
+  toArray,
+  isDefined
 } = require("../utils/productHelper");
 
 // ==========================================
@@ -52,20 +54,20 @@ const addProduct = async (req, res) => {
     const vendorId = req.user._id;
 
     // const category = await Category.findById( categoryId);
-      const [validateCategory, validateTax, validateAtrributeValue] = await Promise.all([
-          checkStatus(Category, body.categoryId),
-          checkStatus(Tax, body.taxId),
-          checkStatus(AttributeValue, body.attributeValues),
-        ]);
-      if (!validateCategory || !validateTax || !validateAtrributeValue) {
-        const missing = !validateCategory? "Category" : !validateTax? "Tax" : "Attribute Value";
+    const [validateCategory, validateTax, validateAtrributeValue] = await Promise.all([
+        checkStatus(Category, body.categoryId),
+        checkStatus(Tax, body.taxId),
+        checkStatus(AttributeValue, body.attributeValues),
+      ]);
+    if (!validateCategory || !validateTax || !validateAtrributeValue) {
+      const missing = !validateCategory ? "Category" : !validateTax  ? "Tax" : "Attribute Value";
 
-        return res.status(400).json({
-          success: false,
-          message: `${missing} is inactive or invalid.`,
-        });
-      }
-   
+      return res.status(400).json({
+        success: false,
+        message: `${missing} is inactive or invalid.`,
+      });
+    }
+
     const productData = {
       vendorId,
       ...mapBasicInfo(body, validateCategory),
@@ -75,9 +77,10 @@ const addProduct = async (req, res) => {
       ...mapProductType(body),
       ...mapShipping(body, toInt, toArray),
       ...mapDimensions(body, toFloat),
-      ...mapPolicies(body, toBool),
+      ...mapPolicies(body),
       ...mapMedia(body),
       ...mapDigitalProduct(body, toBool),
+      ...mapSEO(body),
       status: body.status === undefined ? true : toBool(body.status),
     };
 
@@ -226,7 +229,7 @@ const deleteProduct = async (req, res) => {
     // Soft delete
     product.isDeleted = true;
     product.deletedAt = new Date();
-    product.isActive = false;
+    product.status = false;
     await product.save();
 
     res.status(200).json({
@@ -255,9 +258,10 @@ const getProduct = async (req, res) => {
       _id: productId,
       isDeleted: false,
     })
-      .populate("vendorId", "fullName email businessName")
-      .populate("categoryId", "name")
-      .populate("taxId", "name rate");
+      .populate("vendorId", "username company")
+      .populate("categoryId", "name sub_category")
+      .populate("taxId", "title percentage")
+      .populate("attributeValues" ,"value swatche_type swatche_value");
 
     if (!product) {
       return res.status(404).json({
@@ -303,12 +307,15 @@ const getAllProducts = async (req, res) => {
       sortBy = "createdAt",
       sortOrder = "desc",
       inStock,
+      deliverableZipcodes
     } = req.query;
+
+    console.log("req product", req.query)
 
     // Build query
     const query = {
       isDeleted: false,
-      isActive: true,
+      status: true,
       isApproved: true,
     };
 
@@ -349,6 +356,18 @@ const getAllProducts = async (req, res) => {
       query.productType = productType;
     }
 
+    if (deliverableZipcodes) {
+      query.$and = [
+        { isDeleted: false }, // Maintain existing base query
+        {
+          $or: [
+            { deliverableType: "all" },
+            { deliverableZipcodes: deliverableZipcodes } 
+          ]
+        }
+      ];
+}
+
     // Stock filter
     if (inStock === "true") {
       query.$or = [
@@ -365,13 +384,31 @@ const getAllProducts = async (req, res) => {
     // Pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
+    console.log(query)
+    console.log("Final Query being sent to MongoDB:", JSON.stringify(query, null, 2));
+
     // Execute query
     const products = await Product.find(query)
-      .populate("vendorId", "fullName businessName")
-      .populate("categoryId", "name")
+      .populate("vendorId", "username company")
+      .populate("categoryId", "name sub_category")
+      .populate("taxId", "title percentage")
+     .populate({
+        path: "attributeValues",
+        select: "value swatche_type swatche_value attribute_id", 
+        populate: ({
+          path: "attribute_id",
+          select: "name type attribute_set_id", 
+          populate:{
+            path :'attribute_set_id',
+            select : "name"
+          }
+        })
+    })
       .sort(sort)
       .skip(skip)
       .limit(parseInt(limit));
+
+    console.log("products", products)
 
     // Get total count
     const total = await Product.countDocuments(query);
@@ -415,7 +452,7 @@ const getVendorProducts = async (req, res) => {
     };
 
     if (filters.status !== undefined) {
-      query.isActive = filters.status === "active";
+      query.status = filters.status === true;
     }
 
     if (filters.productType) {
@@ -434,8 +471,8 @@ const getVendorProducts = async (req, res) => {
     // Calculate stats
     const [totalItems, active, inactive, pending] = await Promise.all([
       Product.countDocuments({ vendorId, isDeleted: false }),
-      Product.countDocuments({ vendorId, isActive: true, isDeleted: false }),
-      Product.countDocuments({ vendorId, isActive: false, isDeleted: false }),
+      Product.countDocuments({ vendorId, status: true, isDeleted: false }),
+      Product.countDocuments({ vendorId, status: false, isDeleted: false }),
       Product.countDocuments({ vendorId, isApproved: false, isDeleted: false }),
     ]);
 
@@ -483,7 +520,7 @@ const getProductsByCategory = async (req, res) => {
     const products = await Product.find({
       categoryId,
       isDeleted: false,
-      isActive: true,
+      status: true,
       isApproved: true,
     })
       .populate("vendorId", "fullName businessName")
@@ -494,7 +531,7 @@ const getProductsByCategory = async (req, res) => {
     const total = await Product.countDocuments({
       categoryId,
       isDeleted: false,
-      isActive: true,
+      status: true,
       isApproved: true,
     });
 
@@ -539,7 +576,7 @@ const searchProducts = async (req, res) => {
     const products = await Product.find({
       $text: { $search: query },
       isDeleted: false,
-      isActive: true,
+      status: true,
       isApproved: true,
     })
       .populate("vendorId", "fullName businessName")
@@ -550,7 +587,7 @@ const searchProducts = async (req, res) => {
     const total = await Product.countDocuments({
       $text: { $search: query },
       isDeleted: false,
-      isActive: true,
+      status: true,
       isApproved: true,
     });
 
@@ -599,13 +636,13 @@ const updateProductStatus = async (req, res) => {
       });
     }
 
-    product.isActive = Boolean(parseInt(status));
+    product.status = Boolean(parseInt(status));
     await product.save();
 
     res.status(200).json({
       success: true,
       message: `Product ${
-        product.isActive ? "activated" : "deactivated"
+        product.status ? "activated" : "deactivated"
       } successfully`,
       data: { product },
     });
@@ -707,7 +744,7 @@ const checkDelivery = async (req, res) => {
     const product = await Product.findOne({
       _id: productId,
       isDeleted: false,
-      isActive: true,
+      status: true,
     });
 
     if (!product) {
@@ -750,7 +787,7 @@ const getFeaturedProducts = async (req, res) => {
     // Get products with high sales or ratings
     const products = await Product.find({
       isDeleted: false,
-      isActive: true,
+      status: true,
       isApproved: true,
     })
       .populate("vendorId", "fullName businessName")
@@ -795,7 +832,7 @@ const getRelatedProducts = async (req, res) => {
       _id: { $ne: productId },
       categoryId: product.categoryId,
       isDeleted: false,
-      isActive: true,
+      status: true,
       isApproved: true,
     })
       .populate("vendorId", "fullName businessName")
@@ -815,10 +852,53 @@ const getRelatedProducts = async (req, res) => {
   }
 };
 
-const approveProduct = async(req, res)=>{
-  
+const approveProduct = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { isApproved, rejectionReason } = req.body;
 
-}
+    let updateData = {
+      isApproved: isApproved,
+      approvedBy: req.user._id,
+      approvedAt: new Date(),
+    };
+
+    if (isApproved === true) {
+      updateData.approvedAt = new Date();
+      updateData.rejectionReason;
+    } else {
+      if (!rejectionReason) {
+        return res.status(400).json({
+          success: false,
+          message: "Please provide a rejection reason.",
+        });
+      }
+      updateData.rejectionReason = rejectionReason;
+      updateData.approvedAt = null;
+    }
+    // 2. Update the product in the database
+    const product = await Product.findByIdAndUpdate(
+      id,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    );
+
+    if (!product) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Product not found" });
+    }
+    res.status(200).json({
+      success: true,
+      message: isApproved
+        ? "Product approved successfully"
+        : "Product rejected",
+      data: product,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
 
 module.exports = {
   addProduct,
@@ -834,5 +914,5 @@ module.exports = {
   checkDelivery,
   getFeaturedProducts,
   getRelatedProducts,
-  approveProduct
+  approveProduct,
 };

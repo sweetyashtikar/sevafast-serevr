@@ -1,10 +1,4 @@
-  // Helper functions
-    const toArray = (str) => str ? str.split(',').map(s => s.trim()) : [];
-    const toInt = (val, def = 0) => parseInt(val) || def;
-    const toFloat = (val, def = 0) => parseFloat(val) || def;
-    const toBool = (val) => Boolean(parseInt(val));
-    const isDefined = (val) => val !== undefined && val !== null && val !== '';
-
+ 
 
 // utils/userSanitizer.js
 const sanitizeUser = (user, options = {}) => {
@@ -118,12 +112,7 @@ module.exports = {
     sanitizeUserForPublic,
     sanitizeUserForAdmin,
     sanitizeUserForSelf,
-    checkStatus,
-    toArray,
-    toInt,
-    toFloat,
-    toBool,
-    isDefined
+    checkStatus
 
 
 };

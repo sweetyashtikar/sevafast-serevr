@@ -13,11 +13,13 @@ const {
   optionalAuth,
 } = require("../middleware/authMiddleware");
 
+const {pagination} = require('../middleware/pagination')
+
 
 // Standard REST Routes
 router.route('/')
     .post( authenticate,authorizePermission("can_manage_products"),createAttributeSet)
-    .get(getAllAttributeSets);
+    .get(pagination,getAllAttributeSets);
 
 router.route('/:id')
     .get(getAttributeSetById)

@@ -8,14 +8,17 @@ const {
   checkIfAdmin
 } = require("../middleware/authMiddleware");
 
+const {pagination} = require("../middleware/pagination")
+
 // Route to create a new role
 
 router.route('/')
-    .get( authenticate,checkIfAdmin,Roles.getAllRoles)
+    .get( authenticate,checkIfAdmin,pagination,Roles.getAllRoles)
     .post(authenticate,checkIfAdmin,Roles.createRole);
 
 
 router.route('/:id')
+    .get(Roles.getRoleById)
     .put(authenticate,checkIfAdmin,Roles.updateRole)
     .delete(authenticate,checkIfAdmin,Roles.deleteRole);
     

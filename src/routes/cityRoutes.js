@@ -3,11 +3,12 @@ const router = express.Router();
 const cityController = require('../controllers/cityController');
 const {pagination} = require('../middleware/pagination'); // The middleware we made
 
-router.route('/cities')
+router.route('/')
     .get(pagination, cityController.getCities)
     .post(cityController.createCity);
 
-router.route('/cities/:id')
+router.route('/:id')
+    .get(cityController.updateCity)     
     .put(cityController.updateCity)
     .delete(cityController.deleteCity);
 

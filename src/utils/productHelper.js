@@ -1,121 +1,156 @@
-const {PRODUCT_TYPES,DELIVERABLE_TYPES} = require('../types/productTypes');
+const {
+  PRODUCT_TYPES,
+  DELIVERABLE_TYPES,
+  VARIANT_STOCK_LEVEL_TYPES,
+  STOCK_STATUS,
+} = require("../types/productTypes");
+
+ // Helper functions
+const toArray = (str) => str ? str.split(',').map(s => s.trim()) : [];
+const toInt = (val, def = 0) => parseInt(val) || def;
+const toFloat = (val, def = 0) => parseFloat(val) || def;
+const toBool = (val) => Boolean(val);
+const isDefined = (val) => val !== undefined && val !== null && val !== '';
+
 
 //helper function for adding product
-function mapBasicInfo(body){
+function mapBasicInfo(body) {
   return {
-    name : body.name,
-    shortDescription : body.short_description,
-    description : body.pro_input_description,
-    extraDescription : body.extra_input_description,
-  }
+    name: body.name,
+    shortDescription: body.shortDescription,
+    description: body.description,
+    extraDescription: body.extraDescription,
+  };
 }
 
-function mapCategorization(body, categoryId,toArray){
-  return{
+function mapCategorization(body, categoryId, toArray) {
+  return {
     categoryId,
-    tags : toArray(body.tags),
-    brand : body.brand,
-    hsnCode : body.hsn_code,
-    madeIn : body.made_in || 'India',
-    indicator : body.indicator || INDICATOR_TYPES.NONE,
-    attributeValues : body.attributeValues,
-  }
+    tags: body.tags,
+    brand: body.brand,
+    hsnCode: body.hsnCode,
+    madeIn: body.madeIn || "India",
+    indicator: body.indicator || INDICATOR_TYPES.NONE,
+    attributeValues: body.attributeValues,
+  };
 }
 
-function mapTaxPricing(body, toBool){
-  return{
-    taxId : body.taxId,
-    isPricesInclusiveTax : toBool(body.is_prices_inclusive_tax),
-  }
-}
-
-function mapInventory(body, toInt){
-  return{
-    totalAllowedQuantity : toInt(body.total_allowed_quantity, 999999),
-    minimumOrderQuantity : toInt(body.minimum_order_quantity, 1),
-    quantityStepSize : toInt(body.quantity_step_size, 1),
-  }
-}
-
-function mapProductType(body){
-  return{
-    productType : body.productType,
-    variantStockLevelType : body.variant_stock_level_type,
-}
-}
-
-function mapShipping(body, toInt, toArray){
-  return{
-    deliverableType : body.deliverable_type || DELIVERABLE_TYPES.ALL,
-    deliverableZipcodes : toArray(body.deliverable_zipcodes),
-    pickupLocation : body.pickup_location,
-  }
-}
-
-function mapDimensions(body, toFloat){
-  return{
-    dimensions : {
-      weight : toFloat(body.weight),
-      height : toFloat(body.height),
-      breadth : toFloat(body.breadth),
-      length : toFloat(body.length)
-    }
-  }
-}
-
-function mapPolicies(body, toBool) {
+function mapTaxPricing(body, toBool) {
   return {
-    codAllowed: toBool(body.cod_allowed),
-    isReturnable: toBool(body.is_returnable),
-    isCancelable: toBool(body.is_cancelable),
-    cancelableTill: body.cancelable_till,
-    warrantyPeriod: body.warranty_period,
-    guaranteePeriod: body.guarantee_period
+    taxId: body.taxId,
+    isPricesInclusiveTax: toBool(body.is_prices_inclusive_tax),
+  };
+}
+
+function mapInventory(body, toInt) {
+  return {
+    totalAllowedQuantity: toInt(body.totalAllowedQuantity, 999999),
+    minimumOrderQuantity: toInt(body.minimumOrderQuantity, 1),
+    quantityStepSize: toInt(body.quantityStepSize, 1),
+  };
+}
+
+function mapProductType(body) {
+  return {
+    productType: body.productType,
+    variantStockLevelType: body.variantStockLevelType,
+  };
+}
+
+function mapShipping(body, toInt, toArray) {
+  return {
+    deliverableType: body.deliverableType || DELIVERABLE_TYPES.ALL,
+    deliverableZipcodes: body.deliverableZipcodes,
+    pickupLocation: body.pickupLocation,
+  };
+}
+
+function mapDimensions(body, toFloat) {
+  return {
+    dimensions: {
+      weight: toFloat(body.dimensions.weight || body.weight),
+      height: toFloat(body.dimensions.height || body.height),
+      breadth: toFloat(body.dimensions.breadth || body.breadth),
+      length: toFloat(body.dimensions.length || body.length),
+    },
+  };
+}
+
+function mapPolicies(body) {
+  console.log(body.codAllowed)
+  return {
+    codAllowed: body.codAllowed,
+    isReturnable: body.isReturnable,
+    isCancelable: body.isCancelable,
+    cancelableTill: body.cancelableTill,
+    warrantyPeriod: body.warrantyPeriod,
+    guaranteePeriod: body.guaranteePeriod,
   };
 }
 
 function mapMedia(body) {
   return {
-    mainImage: body.pro_input_image,
-    otherImages: body.other_images || [],
+    mainImage: body.mainImage,
+    otherImages: body.otherImages || [],
     video: {
-      type: body.video_type,
-      url: body.video,
-      file: body.pro_input_video
-    }
+      videoType: (body.videoType || body.video.videoType),
+      url: (body.url || body.video.url),
+      file: (body.pro_input_video || body.video.pro_input_video),
+    },
   };
 }
 
 function mapDigitalProduct(body, toBool) {
   return {
-    downloadAllowed: toBool(body.download_allowed),
-    downloadLinkType: body.download_link_type,
-    downloadFile: body.pro_input_zip,
-    downloadLink: body.download_link
+    downloadAllowed: toBool(body.downloadAllowed),
+    downloadLinkType: body.downloadLinkType,
+    downloadFile: body.downloadFile,
+    downloadLink: body.downloadLink,
   };
 }
 
-function addProductTypeData(productData, body, toInt, toFloat, toArray) {
+function mapSEO(body){
+  return {
+    seo: {
+      metaTitle: (body.metaTitle || body.seo.metaTitle),
+      metaDescription: (body.metaDescription || body.seo.metaDescription),
+      metaKeywords: (body.metaKeywords || body.seo.metaKeywords),
+    },
+  };
+}
+
+function addProductTypeData(productData, body, toInt, toFloat) {
   const { productType } = body;
+  console.log("product type",productType)
 
   // Simple Product
   if (productType === PRODUCT_TYPES.SIMPLE) {
     productData.simpleProduct = {
-      price: toFloat(body.simple_price),
-      specialPrice: body.simple_special_price ? toFloat(body.simple_special_price) : undefined,
-      sku: body.product_sku,
-      totalStock: toInt(body.product_total_stock),
-      stockStatus: body.simple_product_stock_status !== undefined ? 
-        body.simple_product_stock_status : STOCK_STATUS.IN_STOCK
+      sp_price: toFloat(body.sp_price || body.simpleProduct.sp_price),
+      sp_specialPrice:body.sp_specialPrice || body.simpleProduct.sp_specialPrice? toFloat(body.sp_specialPrice || body.simpleProduct.sp_specialPrice) : undefined,
+      sp_sku: body.sp_sku || body.simpleProduct.sp_sku,
+      sp_totalStock: toInt(body.sp_totalStock || body.simpleProduct.sp_totalStock || 0),
+      sp_stockStatus: body.sp_stockStatus ||  body.simpleProduct.sp_stockStatus || STOCK_STATUS.IN_STOCK,
     };
   }
 
   // Digital Product
   if (productType === PRODUCT_TYPES.DIGITAL) {
     productData.simpleProduct = {
-      price: toFloat(body.simple_price),
-      specialPrice: body.simple_special_price ? toFloat(body.simple_special_price) : undefined
+      sp_price: toFloat(body.sp_price || body.simpleProduct.sp_price),
+      sp_specialPrice: body.sp_specialPrice || body.simpleProduct.sp_specialPrice ? toFloat(body.sp_specialPrice || body.simpleProduct.sp_specialPrice) : undefined,
+      sp_sku: body.sp_sku || body.simpleProduct.sp_sku || "",
+      sp_totalStock: toInt(body.sp_totalStock || body.simpleProduct.sp_totalStock || 0), 
+      sp_stockStatus: STOCK_STATUS.IN_STOCK,
     };
+      if (isDefined(body.variantStockLevelType || body.productType)) {
+        console.log(body.variantStockLevelType)
+        console.log(body.productType)
+      // If switching from product-level to variant-level, remove productLevelStock
+      if ((body.variantStockLevelType === VARIANT_STOCK_LEVEL_TYPES.VARIABLE_LEVEL) && (body.productType === PRODUCT_TYPES.DIGITAL)) {
+        delete product.productLevelStock;
+      }
+    }
   }
 
   // Variable Product
@@ -123,150 +158,200 @@ function addProductTypeData(productData, body, toInt, toFloat, toArray) {
     productData.variants = buildVariants(body, toInt, toFloat);
 
     // Product level stock management
-    if (body.variant_stock_level_type === STOCK_LEVEL_TYPES.PRODUCT_LEVEL) {
+    if (body.variantStockLevelType === VARIANT_STOCK_LEVEL_TYPES.PRODUCT_LEVEL) {
+      console.log(productData)
       productData.productLevelStock = {
-        sku: body.sku_variant_type,
-        totalStock: toInt(body.total_stock_variant_type),
-        stockStatus: body.variant_status || STOCK_STATUS.IN_STOCK
+        pls_sku: body.pls_sku || body.productLevelStock.pls_sku || "",
+        pls_totalStock: toInt(body.pls_totalStock || body.productLevelStock.pls_totalStock || 0),
+        pls_stockStatus:body.pls_stockStatus || body.productLevelStock.pls_stockStatus || STOCK_STATUS.IN_STOCK,
       };
     }
   }
 }
 
 function buildVariants(body, toInt, toFloat) {
-  const variantIds = body.variants_ids.split(',').map(v => v.trim());
-  const prices = body.variant_price.split(',').map(p => toFloat(p));
-  const specialPrices = body.variant_special_price ? 
-    body.variant_special_price.split(',').map(p => toFloat(p)) : [];
+  // If variants are sent as an array of objects
+  if (body.variants && Array.isArray(body.variants)) {
+    return body.variants.map((variantData) => {
+      const variant = {
+        // Pricing
+        variant_price: toFloat(variantData.variant_price || variantData.price),
+        variant_specialPrice:
+          variantData.variant_specialPrice || variantData.special_price
+            ? toFloat(
+                variantData.variant_specialPrice || variantData.special_price
+              )
+            : undefined,
 
-  // Pre-split dimension arrays if they exist
-  const dimensions = {
-    weight: body.weight ? body.weight.split(',') : [],
-    height: body.height ? body.height.split(',') : [],
-    breadth: body.breadth ? body.breadth.split(',') : [],
-    length: body.length ? body.length.split(',') : []
-  };
+        // Stock management
+        variant_sku: variantData.variant_sku || variantData.sku || "",
+        variant_totalStock:
+          variantData.variant_totalStock || variantData.stock_quantity
+            ? toInt(
+                variantData.variant_totalStock || variantData.stock_quantity
+              )
+            : 0,
+        variant_stockStatus:
+          variantData.variant_stockStatus ||
+          variantData.stock_status ||
+          STOCK_STATUS.IN_STOCK,
 
-  // Variable level stock arrays
-  const stockData = body.variant_stock_level_type === STOCK_LEVEL_TYPES.VARIABLE_LEVEL ? {
-    skus: body.variant_sku ? body.variant_sku.split(',') : [],
-    stocks: body.variant_total_stock ? body.variant_total_stock.split(',') : [],
-    statuses: body.variant_level_stock_status ? body.variant_level_stock_status.split(',') : []
-  } : null;
+        // Dimensions
+        variant_weight:
+          variantData.variant_weight || variantData.weight
+            ? toFloat(variantData.variant_weight || variantData.weight)
+            : undefined,
+        variant_height:
+          variantData.variant_height || variantData.height
+            ? toFloat(variantData.variant_height || variantData.height)
+            : undefined,
+        variant_breadth:
+          variantData.variant_breadth || variantData.breadth
+            ? toFloat(variantData.variant_breadth || variantData.breadth)
+            : undefined,
+        variant_length:
+          variantData.variant_length || variantData.length
+            ? toFloat(variantData.variant_length || variantData.length)
+            : undefined,
 
-  return variantIds.map((ids, i) => {
-    const variant = {
-      variantIds: ids,
-      price: prices[i],
-      specialPrice: specialPrices[i] || undefined,
-      images: body.variant_images?.[i] || [],
-      weight: dimensions.weight[i] ? toFloat(dimensions.weight[i]) : 0,
-      height: dimensions.height[i] ? toFloat(dimensions.height[i]) : 0,
-      breadth: dimensions.breadth[i] ? toFloat(dimensions.breadth[i]) : 0,
-      length: dimensions.length[i] ? toFloat(dimensions.length[i]) : 0
-    };
+        // Images
+        variant_images: variantData.variant_images
+          ? Array.isArray(variantData.variant_images)
+            ? variantData.variant_images
+            : variantData.variant_images
+                .split(",")
+                .map((img) => img.trim())
+                .filter((img) => img)
+          : [],
 
-    // Add variable level stock data if applicable
-    if (stockData) {
-      variant.sku = stockData.skus[i] || '';
-      variant.totalStock = toInt(stockData.stocks[i]);
-      variant.stockStatus = toInt(stockData.statuses[i], STOCK_STATUS.IN_STOCK);
-    }
+        // Status
+        variant_isActive:
+          variantData.variant_isActive !== undefined
+            ? variantData.variant_isActive
+            : true,
+      };
 
-    return variant;
-  });
+      return variant;
+    });
+  }
+
+  // No variants provided
+  return [];
 }
 
-
-
 //helper function for updating product
-const shouldUpdate = (val) => val !== undefined && val !== null && val !== '';
+const shouldUpdate = (val) => val !== undefined && val !== null && val !== "";
 
 // Update functions
 function updateBasicInfo(product, body) {
   if (shouldUpdate(body.name)) product.name = body.name;
-  if (shouldUpdate(body.short_description)) product.shortDescription = body.short_description;
-  if (shouldUpdate(body.pro_input_description)) product.description = body.pro_input_description;
-  if (shouldUpdate(body.extra_input_description)) product.extraDescription = body.extra_input_description;
+  if (shouldUpdate(body.shortDescription)) product.shortDescription = body.shortDescription;
+  if (shouldUpdate(body.description)) product.description = body.description;
+  if (shouldUpdate(body.extraDescription)) product.extraDescription = body.extraDescription;
 }
 
-function updateCategorization(product, body, toArray, toInt) {
-  if (shouldUpdate(body.tags)) product.tags = toArray(body.tags);
+function updateCategorization(product, body, toArray) {
+  if (shouldUpdate(body.categoryId)) product.categoryId = body.categoryId;
+  if (shouldUpdate(body.tags)) product.tags = body.tags;
   if (shouldUpdate(body.brand)) product.brand = body.brand;
-  if (shouldUpdate(body.hsn_code)) product.hsnCode = body.hsn_code;
-  if (shouldUpdate(body.made_in)) product.madeIn = body.made_in;
-  if (shouldUpdate(body.indicator)) product.indicator = body.indicator;
-  if (shouldUpdate(body.attribute_values)) product.attributeValues = toArray(body.attribute_values);
+  if (shouldUpdate(body.hsnCode)) product.hsnCode = body.hsnCode;
+  if (shouldUpdate(body.madeIn)) product.madeIn = body.madeIn;
+  if (shouldUpdate(body.indicator)) product.indicator = body.indicator || INDICATOR_TYPES.NONE;
+  if (shouldUpdate(body.attribute_values)) product.attributeValues = body.attribute_values;
 }
 
 function updateTaxPricing(product, body, toBool) {
-  if (shouldUpdate(body.pro_input_tax)) product.taxId = body.pro_input_tax;
-  if (shouldUpdate(body.is_prices_inclusive_tax)) {
-    product.isPricesInclusiveTax = toBool(body.is_prices_inclusive_tax);
+  if (shouldUpdate(body.taxId)) product.taxId = body.taxId;
+  if (shouldUpdate(body.isPricesInclusiveTax)) {
+    product.isPricesInclusiveTax = toBool(body.isPricesInclusiveTax);
   }
 }
 
 function updateInventory(product, body, toInt) {
-  if (shouldUpdate(body.total_allowed_quantity)) {
-    product.totalAllowedQuantity = toInt(body.total_allowed_quantity, 999999);
+  if (shouldUpdate(body.totalAllowedQuantity)) {
+    product.totalAllowedQuantity = toInt(body.totalAllowedQuantity, 999999);
   }
-  if (shouldUpdate(body.minimum_order_quantity)) {
-    product.minimumOrderQuantity = toInt(body.minimum_order_quantity, 1);
+  if (shouldUpdate(body.minimumOrderQuantity)) {
+    product.minimumOrderQuantity = toInt(body.minimumOrderQuantity, 1);
   }
-  if (shouldUpdate(body.quantity_step_size)) {
-    product.quantityStepSize = toInt(body.quantity_step_size, 1);
+  if (shouldUpdate(body.quantityStepSize)) {
+    product.quantityStepSize = toInt(body.quantityStepSize, 1);
   }
 }
 
 function updateShipping(product, body, toInt, toArray) {
-  if (shouldUpdate(body.deliverable_type)) {
-    product.deliverableType = body.deliverable_type || DELIVERABLE_TYPES.ALL;
+  if (shouldUpdate(body.deliverableType)) {
+    product.deliverableType = body.deliverableType || DELIVERABLE_TYPES.ALL;
   }
-  if (shouldUpdate(body.deliverable_zipcodes)) {
-    product.deliverableZipcodes = toArray(body.deliverable_zipcodes);
+  if (shouldUpdate(body.deliverableZipcodes)) {
+    product.deliverableZipcodes = body.deliverableZipcodes;
   }
-  if (shouldUpdate(body.pickup_location)) {
-    product.pickupLocation = body.pickup_location;
+  if (shouldUpdate(body.pickupLocation)) {
+    product.pickupLocation = body.pickupLocation;
   }
 }
 
 function updateDimensions(product, body, toFloat) {
   if (!product.dimensions) product.dimensions = {};
-  
-  if (shouldUpdate(body.weight)) product.dimensions.weight = toFloat(body.weight);
-  if (shouldUpdate(body.height)) product.dimensions.height = toFloat(body.height);
-  if (shouldUpdate(body.breadth)) product.dimensions.breadth = toFloat(body.breadth);
-  if (shouldUpdate(body.length)) product.dimensions.length = toFloat(body.length);
+
+  if (shouldUpdate(body.weight || body.dimensions.weight))
+    product.dimensions.weight = toFloat(body.dimensions.weight || body.weigth);
+  if (shouldUpdate(body.height || body.dimensions.height))
+    product.dimensions.height = toFloat(body.height || body.dimensions.height);
+  if (shouldUpdate(body.breadth || body.dimensions.breadth))
+    product.dimensions.breadth = toFloat(body.breadth || body.dimensions.breadth);
+  if (shouldUpdate(body.length || body.dimensions.length))
+    product.dimensions.length = toFloat(body.length || body.dimensions.length);
 }
 
 function updatePolicies(product, body, toBool) {
-  if (shouldUpdate(body.cod_allowed)) product.codAllowed = toBool(body.cod_allowed);
-  if (shouldUpdate(body.is_returnable)) product.isReturnable = toBool(body.is_returnable);
-  if (shouldUpdate(body.is_cancelable)) product.isCancelable = toBool(body.is_cancelable);
-  if (shouldUpdate(body.cancelable_till)) product.cancelableTill = body.cancelable_till;
-  if (shouldUpdate(body.warranty_period)) product.warrantyPeriod = body.warranty_period;
-  if (shouldUpdate(body.guarantee_period)) product.guaranteePeriod = body.guarantee_period;
+  if (shouldUpdate(body.codAllowed))
+    product.codAllowed = toBool(body.codAllowed);
+  if (shouldUpdate(body.isReturnable))
+    product.isReturnable = toBool(body.isReturnable);
+  if (shouldUpdate(body.isCancelable))
+    product.isCancelable = toBool(body.isCancelable);
+  if (shouldUpdate(body.cancelableTill))
+    product.cancelableTill = body.cancelableTill;
+  if (shouldUpdate(body.warrantyPeriod))
+    product.warrantyPeriod = body.warrantyPeriod;
+  if (shouldUpdate(body.guaranteePeriod))
+    product.guaranteePeriod = body.guaranteePeriod;
 }
 
 function updateMedia(product, body) {
-  if (shouldUpdate(body.pro_input_image)) product.mainImage = body.pro_input_image;
-  if (shouldUpdate(body.other_images)) product.otherImages = body.other_images;
-  
+  if (shouldUpdate(body.mainImage)) product.mainImage = body.mainImage;
+  if (shouldUpdate(body.otherImages)) product.otherImages = body.otherImages || [];
+
   if (!product.video) product.video = {};
-  if (shouldUpdate(body.video_type)) product.video.type = body.video_type;
-  if (shouldUpdate(body.video)) product.video.url = body.video;
-  if (shouldUpdate(body.pro_input_video)) product.video.file = body.pro_input_video;
+  if (shouldUpdate(body.videoType || body.video.videoType)) 
+    product.video.videoType = (body.videoType || body.video.videoType);
+  if (shouldUpdate(body.url || body.video.url)) 
+    product.video.url = (body.url || body.video.url);
+  if (shouldUpdate(body.file || body.video.file))
+    product.video.file = (body.file || body.video.file);
 }
 
+function updateSEO(product, body) {
+  if (!product.seo) product.seo = {};
+  if (shouldUpdate(body.metaTitle || body.seo.metaTitle)) 
+    product.seo.metaTitle = (body.metaTitle || body.seo.metaTitle);
+  if (shouldUpdate(body.metaDescription || body.seo.metaDescription))
+    product.seo.metaDescription = (body.metaDescription || body.seo.metaDescription);
+  if (shouldUpdate(body.metaKeywords || body.seo.metaKeywords)) 
+    product.seo.metaKeywords = (body.metaKeywords || body.seo.metaKeywords);
+}
+
+
 function updateDigitalProduct(product, body, toBool) {
-  if (shouldUpdate(body.download_allowed)) {
-    product.downloadAllowed = toBool(body.download_allowed);
+  if (shouldUpdate(body.downloadAllowed)) {
+    product.downloadAllowed = toBool(body.downloadAllowed);
   }
-  if (shouldUpdate(body.download_link_type)) {
-    product.downloadLinkType = body.download_link_type;
+  if (shouldUpdate(body.downloadLinkType)) {
+    product.downloadLinkType = body.downloadLinkType;
   }
-  if (shouldUpdate(body.pro_input_zip)) product.downloadFile = body.pro_input_zip;
-  if (shouldUpdate(body.download_link)) product.downloadLink = body.download_link;
+  if (shouldUpdate(body.downloadFile)) product.downloadFile = body.downloadFile;
+  if (shouldUpdate(body.downloadLink)) product.downloadLink = body.downloadLink;
 }
 
 function updateProductTypeData(product, body, toInt, toFloat, toArray, isDefined) {
@@ -275,132 +360,109 @@ function updateProductTypeData(product, body, toInt, toFloat, toArray, isDefined
   // Update Simple Product
   if (productType === PRODUCT_TYPES.SIMPLE) {
     if (!product.simpleProduct) product.simpleProduct = {};
-    
-    if (isDefined(body.simple_price)) {
-      product.simpleProduct.price = toFloat(body.simple_price);
+
+    if (isDefined(body.sp_price || body.simpleProduct?.sp_price)) {
+      product.simpleProduct.sp_price = toFloat(body.sp_price || body.simpleProduct?.sp_price);
     }
-    if (isDefined(body.simple_special_price)) {
-      product.simpleProduct.specialPrice = body.simple_special_price ? 
-        toFloat(body.simple_special_price) : undefined;
+    if (isDefined(body.sp_specialPrice || body.simpleProduct?.sp_specialPrice)) {
+      product.simpleProduct.sp_specialPrice = (body.sp_specialPrice || body.simpleProduct?.sp_specialPrice)
+        ? toFloat(body.sp_specialPrice || body.simpleProduct?.sp_specialPrice)
+        : undefined;
     }
-    if (isDefined(body.product_sku)) {
-      product.simpleProduct.sku = body.product_sku;
+    if (isDefined(body.sp_sku || body.simpleProduct?.sp_sku)) {
+      product.simpleProduct.sp_sku = body.sp_sku || body.simpleProduct?.sp_sku;
     }
-    if (isDefined(body.product_total_stock)) {
-      product.simpleProduct.totalStock = toInt(body.product_total_stock);
+    if (isDefined(body.sp_totalStock || body.simpleProduct?.sp_totalStock)) {
+      product.simpleProduct.sp_totalStock = toInt(body.sp_totalStock || body.simpleProduct?.sp_totalStock || 0);
     }
-    if (isDefined(body.simple_product_stock_status)) {
-      product.simpleProduct.stockStatus = body.simple_product_stock_status;
+    if (isDefined(body.sp_stockStatus || body.simpleProduct?.sp_stockStatus)) {
+      product.simpleProduct.sp_stockStatus = body.sp_stockStatus || body.simpleProduct?.sp_stockStatus || STOCK_STATUS.IN_STOCK;
     }
   }
 
   // Update Digital Product
   if (productType === PRODUCT_TYPES.DIGITAL) {
     if (!product.simpleProduct) product.simpleProduct = {};
-    
-    if (isDefined(body.simple_price)) {
-      product.simpleProduct.price = toFloat(body.simple_price);
+
+    if (isDefined(body.sp_price || body.simpleProduct?.sp_price)) {
+      product.simpleProduct.sp_price = toFloat(body.sp_price || body.simpleProduct?.sp_price);
     }
-    if (isDefined(body.simple_special_price)) {
-      product.simpleProduct.specialPrice = body.simple_special_price ? 
-        toFloat(body.simple_special_price) : undefined;
+    if (isDefined(body.sp_specialPrice || body.simpleProduct?.sp_specialPrice)) {
+      product.simpleProduct.sp_specialPrice = (body.sp_specialPrice || body.simpleProduct?.sp_specialPrice)
+        ? toFloat(body.sp_specialPrice || body.simpleProduct?.sp_specialPrice)
+        : undefined;
     }
+    if (isDefined(body.sp_sku || body.simpleProduct?.sp_sku)) {
+      product.simpleProduct.sp_sku = body.sp_sku || body.simpleProduct?.sp_sku || "";
+    }
+    if (isDefined(body.sp_totalStock || body.simpleProduct?.sp_totalStock)) {
+      product.simpleProduct.sp_totalStock = toInt(body.sp_totalStock || body.simpleProduct?.sp_totalStock || 0);
+    }
+    // Digital products always have IN_STOCK status
+    product.simpleProduct.sp_stockStatus = STOCK_STATUS.IN_STOCK;
   }
 
   // Update Variable Product
   if (productType === PRODUCT_TYPES.VARIABLE) {
     // Only rebuild variants if variant data is provided
-    if (isDefined(body.variants_ids) && isDefined(body.variant_price)) {
+    if (isDefined(body.variants) || isDefined(body.variants_ids) || isDefined(body.variant_price)) {
       product.variants = buildVariants(body, toInt, toFloat);
     }
 
     // Update product level stock if applicable
-    if (body.variant_stock_level_type === STOCK_LEVEL_TYPES.PRODUCT_LEVEL) {
+    if (body.variantStockLevelType === VARIANT_STOCK_LEVEL_TYPES.PRODUCT_LEVEL) {
       if (!product.productLevelStock) product.productLevelStock = {};
-      
-      if (isDefined(body.sku_variant_type)) {
-        product.productLevelStock.sku = body.sku_variant_type;
+
+      if (isDefined(body.pls_sku || body.productLevelStock?.pls_sku)) {
+        product.productLevelStock.pls_sku = body.pls_sku || body.productLevelStock?.pls_sku || "";
       }
-      if (isDefined(body.total_stock_variant_type)) {
-        product.productLevelStock.totalStock = toInt(body.total_stock_variant_type);
+      if (isDefined(body.pls_totalStock || body.productLevelStock?.pls_totalStock)) {
+        product.productLevelStock.pls_totalStock = toInt(body.pls_totalStock || body.productLevelStock?.pls_totalStock || 0);
       }
-      if (isDefined(body.variant_status)) {
-        product.productLevelStock.stockStatus = toInt(body.variant_status, STOCK_STATUS.IN_STOCK);
+      if (isDefined(body.pls_stockStatus || body.productLevelStock?.pls_stockStatus)) {
+        product.productLevelStock.pls_stockStatus = body.pls_stockStatus || body.productLevelStock?.pls_stockStatus || STOCK_STATUS.IN_STOCK;
+      }
+    }
+    
+    // If changing stock level type, ensure consistency
+    if (isDefined(body.variantStockLevelType || body.productType)) {
+      // If switching from product-level to variant-level, remove productLevelStock
+      if ((body.variantStockLevelType === VARIANT_STOCK_LEVEL_TYPES.VARIABLE_LEVEL) && (body.productType === PRODUCT_TYPES.DIGITAL)) {
+        delete product.productLevelStock;
       }
     }
   }
 }
 
-function buildVariants(body, toInt, toFloat) {
-  const variantIds = body.variants_ids.split(',').map(v => v.trim());
-  const prices = body.variant_price.split(',').map(p => toFloat(p));
-  const specialPrices = body.variant_special_price ? 
-    body.variant_special_price.split(',').map(p => toFloat(p)) : [];
-
-  // Pre-split dimension arrays if they exist
-  const dimensions = {
-    weight: body.weight ? body.weight.split(',') : [],
-    height: body.height ? body.height.split(',') : [],
-    breadth: body.breadth ? body.breadth.split(',') : [],
-    length: body.length ? body.length.split(',') : []
-  };
-
-  // Variable level stock arrays
-  const stockData = body.variant_stock_level_type === STOCK_LEVEL_TYPES.VARIABLE_LEVEL ? {
-    skus: body.variant_sku ? body.variant_sku.split(',') : [],
-    stocks: body.variant_total_stock ? body.variant_total_stock.split(',') : [],
-    statuses: body.variant_level_stock_status ? body.variant_level_stock_status.split(',') : []
-  } : null;
-
-  return variantIds.map((ids, i) => {
-    const variant = {
-      variantIds: ids,
-      price: prices[i],
-      specialPrice: specialPrices[i] || undefined,
-      images: body.variant_images?.[i] || [],
-      weight: dimensions.weight[i] ? toFloat(dimensions.weight[i]) : 0,
-      height: dimensions.height[i] ? toFloat(dimensions.height[i]) : 0,
-      breadth: dimensions.breadth[i] ? toFloat(dimensions.breadth[i]) : 0,
-      length: dimensions.length[i] ? toFloat(dimensions.length[i]) : 0
-    };
-
-    // Add variable level stock data if applicable
-    if (stockData) {
-      variant.sku = stockData.skus[i] || '';
-      variant.totalStock = toInt(stockData.stocks[i]);
-      variant.stockStatus = toInt(stockData.statuses[i], STOCK_STATUS.IN_STOCK);
-    }
-
-    return variant;
-  });
-}
 
 module.exports = {
   mapBasicInfo,
   mapCategorization,
-    mapTaxPricing,
-    mapInventory,
-    mapProductType,
-    mapShipping,
-    mapDimensions,
-    mapPolicies,
-    mapMedia,
+  mapTaxPricing,
+  mapInventory,
+  mapProductType,
+  mapShipping,
+  mapDimensions,
+  mapPolicies,
+  mapMedia,
 
-    mapDigitalProduct,
-    addProductTypeData,
-    updateBasicInfo,
-    updateCategorization,
-    updateTaxPricing,
-    updateInventory,
-updateProductTypeData,
-    updateShipping,
-    updateDimensions,
-    updatePolicies,
-    updateMedia,
-    updateDigitalProduct,
-
-
-
-
-
-}
+  mapDigitalProduct,
+  addProductTypeData,
+  updateBasicInfo,
+  updateCategorization,
+  updateTaxPricing,
+  updateInventory,
+  updateProductTypeData,
+  updateShipping,
+  updateDimensions,
+  updatePolicies,
+  updateMedia,
+  updateDigitalProduct,
+  mapSEO,
+  updateSEO,
+  toBool,
+  toFloat,
+  toInt,
+  toArray,
+  isDefined
+};

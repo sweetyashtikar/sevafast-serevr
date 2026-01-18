@@ -7,12 +7,11 @@ const { authenticate, authorizePermission } = require("../middleware/authMiddlew
 router
   .route("/")
   .get(pagination, Category.getAllCategories)
-  .post( authenticate,
-         authorizePermission("can_manage_products"),Category.createCategory);
+  .post( authenticate,authorizePermission("can_manage_products"),Category.createCategory);
 
 router
   .route("/:id")
-  .get(pagination, Category.getCategoryById)
+  .get(Category.getCategoryById)
   .put(Category.updateCategory)
   .put(Category.checkCategoryStatus)
   .delete(Category.deleteCategory);

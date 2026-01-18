@@ -16,12 +16,12 @@ const {
 
 // Standard RESTful endpoints
 router.route('/')
-  .post(authenticate,checkIfAdmin,createTax)
-  .get(authenticate,checkIfAdmin,getAllTaxes);
+  .post(authenticate,authorizePermission("can_manage_products"),createTax)
+  .get(authenticate,authorizePermission("can_manage_products"),getAllTaxes);
 
 router.route('/:id')
-  .get(authenticate,checkIfAdmin,getTaxById)
-  .put(authenticate,checkIfAdmin,updateTax)
-  .delete(authenticate,checkIfAdmin,deleteTax);
+  .get(authenticate,authorizePermission("can_manage_products"),getTaxById)
+  .put(authenticate,authorizePermission("can_manage_products"),updateTax)
+  .delete(authenticate,authorizePermission("can_manage_products"),deleteTax);
 
 module.exports = router;

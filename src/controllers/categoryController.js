@@ -26,11 +26,25 @@ const createCategory = async (req, res) => {
 
 // 2. Get All Categories (with Hierarchy)
 const getAllCategories = async (req, res) => {
+    const { limit, offset, sort, searchQuery, filters } = req.paginationQuery;
+
+    const finalQuery = { ...searchQuery, ...filters };
+
     try {
-        // .populate('parent_id', 'name') helps see the parent name instead of just ID
-        const categories = await Category.find().sort({ row_order: 1 });
+        const categories = await Category.find(finalQuery)
+        .sort(sort)
+        .skip(offset)
+        .limit(limit);
+
+        const total = await Category.countDocuments(finalQuery);
             
-        res.status(200).json({ success: true, count: categories.length, data: categories });
+        res.status(200).json({ 
+            success: true,
+            total,
+            limit,
+            offset, 
+            count: categories.length,
+            data: categories });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -40,13 +54,11 @@ const getAllCategories = async (req, res) => {
 const getCategoryById = async (req, res) => {
     const id = req.params.id
     try {
-        const category = await Category.findByIdAndUpdate(
-            id, 
-            { $inc: { clicks: 1 } }, // Automatically increment clicks by 1
-            { new: true }
-        );
-
+        const category = await Category.findById(id);
+        
         if (!category) return res.status(404).json({ message: "Not found" });
+
+        await category.incrementClicks();
         res.status(200).json({ success: true, data: category });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
