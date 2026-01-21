@@ -544,7 +544,7 @@ const productSchema = new mongoose.Schema(
 // INDEXES
 // ==========================================
 
-productSchema.index({ vendorId: 1 });
+// productSchema.index({ vendorId: 1 });
 productSchema.index({ categoryId: 1, status: 1 });
 productSchema.index({ name: "text", tags: "text" });
 // productSchema.index({ "simpleProduct.price": 1 });

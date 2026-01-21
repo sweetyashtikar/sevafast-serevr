@@ -23,12 +23,12 @@ const areaSchema = new mongoose.Schema({
 
     // Delivery Logic (Critical for Checkout)
     minimum_free_delivery_order_amount: { 
-        type: Number, 
+        type: String, 
         default: 100 
     },
     
     delivery_charges: { 
-        type: Number, 
+        type: String, 
         default: 0 
     },
 

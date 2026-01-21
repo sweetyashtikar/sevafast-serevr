@@ -22,6 +22,14 @@ const attributeRoute = require('./src/routes/attributeRoute')
 const attributeValueRoute = require("./src/routes/attributeValue")
 const taxRoute = require('./src/routes/taxRoute')
 const StatusRoute = require('./src/controllers/status')
+const CartRoute = require('./src/routes/cartRoute')
+const ZipcodeRoute = require('./src/routes/zipcodeRoute')
+const areaRoute = require('./src/routes/areaRoute')
+const addressRoute = require('./src/routes/addressRoute')
+const sellerRoute = require('./src/routes/sellerRoute')
+const faqRoute = require('./src/routes/faqroute')
+const favouriteRoute = require('./src/routes/favouriteRoute')
+const productFaqRoute = require('./src/routes/productFAQRoute');
 
 
 
@@ -52,6 +60,14 @@ app.use('/api/attributeSet', attributeSetRoute)
 app.use('/api/attribute', attributeRoute)
 app.use('/api/attributeValue',attributeValueRoute)
 app.use('/api/tax',taxRoute)
+app.use('/api/cart',CartRoute)
+app.use('/api/zipCode',ZipcodeRoute)
+app.use('/api/area',areaRoute)
+app.use('/api/address',addressRoute)
+app.use('/api/seller', sellerRoute)
+app.use('/api/faq', faqRoute)
+app.use('/api/favourite', favouriteRoute)
+app.use('/api/product-faqs', productFaqRoute);
 
 
 

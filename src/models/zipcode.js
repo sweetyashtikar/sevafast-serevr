@@ -5,8 +5,8 @@ const zipcodeSchema = new mongoose.Schema({
     zipcode: {
         type: String,
         required: true,
-        unique: true,
-        trim: true
+        trim: true,
+        unique:true
     }
 }, { 
     // date_created

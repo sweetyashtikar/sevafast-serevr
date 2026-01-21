@@ -9,16 +9,12 @@ const Status = {
 }
 
 const sellerSchema = new mongoose.Schema({
-    // Link to the User model we created earlier
     user_id: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true
     },
-    // For SEO friendly URLs (e.g., /store/mafat-ka-maal)
     slug: { type: String, unique: true, sparse: true },
-    
-    // Converted from comma-separated string to Array of ObjectIds
     category_ids: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Category'
@@ -27,7 +23,7 @@ const sellerSchema = new mongoose.Schema({
     store_info: {
         name: { type: String, required: true },
         description: { type: String },
-        logo: { type: String }, // Path to the image
+        logo: { type: String }, 
         url: { type: String }
     },
 
@@ -44,8 +40,8 @@ const sellerSchema = new mongoose.Schema({
     },
 
     documents: {
-        national_identity_card: String, // Path to file
-        address_proof: String,          // Path to file
+        national_identity_card: String, 
+        address_proof: String,         
         pan_number: String
     },
 
@@ -54,7 +50,6 @@ const sellerSchema = new mongoose.Schema({
         tax_number: String
     },
 
-    // Parsed from the JSON string in the SQL
     permissions: {
         require_products_approval: { type: Boolean, default: true },
         customer_privacy: { type: Boolean, default: true },
@@ -66,10 +61,9 @@ const sellerSchema = new mongoose.Schema({
     zipcodes: [{
          type: mongoose.Schema.Types.ObjectId,
         ref: 'Zipcode',
-        required: true // Array of serviceable zip codes
+        required: true 
     }],
     
-    // approved: 1 | not-approved: 2 | deactive: 0 | removed: 7
     status: { 
         type: String, 
         enum: [Status.APPROVED, Status.NOT_APPROVED, Status.DEACTIVE, Status.REMOVED], 
@@ -79,7 +73,16 @@ const sellerSchema = new mongoose.Schema({
     timestamps: true
 });
 
-// Indexing for faster store searches
 sellerSchema.index({ "store_info.name": "text" });
+
+sellerSchema.pre("save", function (next) {
+  if (this.isModified("store_info.name") && !this.slug) {
+    this.slug = this.store_info.name
+      .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+
+    // Add random suffix to ensure uniqueness
+    this.slug += `-${Date.now().toString(36)}`;
+  }
+});
 
 module.exports = mongoose.model('Seller', sellerSchema);
