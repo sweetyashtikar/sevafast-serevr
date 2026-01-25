@@ -1,8 +1,12 @@
 const OrderItem = require('../models/orderItem');
-const Order = require('../models/order');
+const Order = require('../models/orders');
 const User = require('../models/User');
-const ProductVariant = require('../models/product');
+const Product = require('../models/products');
 const mongoose = require('mongoose');
+const Address = require('../models/address');
+const {checkId, checkStatus} = require('../utils/sanitizer');
+const {PaymentMethod} = require('../models/orders');
+const {PRODUCT_TYPES, STOCK_STATUS} = require('../types/productTypes');
 
 /**
  * ORDER ITEM CRUD CONTROLLER
@@ -10,148 +14,290 @@ const mongoose = require('mongoose');
 
 // 1. CREATE - Create single order item (usually done via Order creation)
 const createOrderItem = async (req, res) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    
     try {
         const {
-            order_id,
-            user_id,
-            seller_id,
-            product_variant_id,
-            product_name,
-            variant_name,
-            quantity,
-            price,
-            discounted_price,
-            tax_percent = 0,
-            discount = 0,
-            admin_commission_amount = 0,
-            seller_commission_amount = 0
+            address_id,
+            mobile,
+            address,
+            location,
+            items,
+            payment_method,
+            promo_details,
+            discount,
+            tax_amount,
+            delivery_info
         } = req.body;
-
-        // Validate required fields
-        const requiredFields = {
-            order_id, user_id, seller_id, product_variant_id,
-            product_name, quantity, price
-        };
         
-        const missingFields = Object.entries(requiredFields)
-            .filter(([_, value]) => !value)
-            .map(([key]) => key);
-
-        if (missingFields.length > 0) {
-            return res.status(400).json({
-                success: false,
-                message: `Missing required fields: ${missingFields.join(', ')}`
+        const user_id = req.user._id;
+        
+        // Validate User and Address IDs
+        await checkId(User, user_id);
+        
+        // Fetch address with populated area and city
+        const userAddress = await Address.findById(address_id)
+            .populate({
+                path: 'area_id',
+                select: 'delivery_charges minimum_free_delivery_order_amount name active'
+            })
+            .populate({
+                path: 'city_id',
+                select: 'name active'
             });
+        console.log(" userAddress ", userAddress);
+        
+        if (!userAddress) {
+            throw new Error('Address not found');
         }
 
-        // Validate IDs
-        const idsToValidate = { order_id, user_id, seller_id, product_variant_id };
-        for (const [field, value] of Object.entries(idsToValidate)) {
-            if (!mongoose.Types.ObjectId.isValid(value)) {
-                return res.status(400).json({
-                    success: false,
-                    message: `Invalid ${field.replace('_', ' ')} format`
-                });
+        // Get delivery charge from area and convert to number
+        const areaDeliveryCharge = parseFloat(userAddress.area_id.delivery_charges) || 0;
+        console.log(" areaDeliveryCharge ", areaDeliveryCharge);
+        const minimumFreeDeliveryAmount = parseFloat(userAddress.area_id.minimum_free_delivery_order_amount) || 0;
+        console.log(" minimumFreeDeliveryAmount ", minimumFreeDeliveryAmount);
+        
+        // Group items by product to efficiently validate variants
+        const productVariantMap = {};
+        items.forEach(item => {
+            if (!productVariantMap[item.product_id]) {
+                productVariantMap[item.product_id] = [];
+            }
+            productVariantMap[item.product_id].push({
+                variantId: item.product_variant_id,
+                quantity: item.quantity
+            });
+        });
+        
+        // Validate all product variants exist and have sufficient stock
+        for (const [productId, variants] of Object.entries(productVariantMap)) {
+            const product = await Product.findById(productId);
+            
+            if (!product) {
+                throw new Error(`Product ${productId} not found`);
+            }
+            
+            // Check if product is active and approved
+            if (!product.status || !product.isApproved || product.isDeleted) {
+                throw new Error(`Product ${productId} is not available`);
+            }
+            
+            // For each variant in this product
+            for (const variantInfo of variants) {
+                const variant = product.variants.id(variantInfo.variantId);
+                
+                if (!variant) {
+                    throw new Error(`Variant ${variantInfo.variantId} not found in product ${productId}`);
+                }
+                
+                if (!variant.variant_isActive) {
+                    throw new Error(`Variant ${variantInfo.variantId} is not active`);
+                }
+                
+                // Check stock availability
+                if (product.productType === 'simple') {
+                    // For simple products, check simple product stock
+                    if (product.simpleProduct.sp_stockStatus !== 'in-stock' || 
+                        product.simpleProduct.sp_totalStock < variantInfo.quantity) {
+                        throw new Error(`Insufficient stock for product ${product.name}`);
+                    }
+                } else if (product.productType === 'variable') {
+                    // For variable products, check variant stock
+                    if (variant.variant_stockStatus !== 'in-stock' || 
+                        variant.variant_totalStock < variantInfo.quantity) {
+                        throw new Error(`Insufficient stock for variant ${product.name}`);
+                    }
+                }
             }
         }
-
-        // Check if order exists
-        const orderExists = await Order.findById(order_id);
-        if (!orderExists) {
-            return res.status(404).json({
-                success: false,
-                message: 'Order not found'
-            });
+        
+        // Calculate sub_total for each item
+     const itemsWithDetails = await Promise.all(items.map(async (item) => {
+    const product = await Product.findById(item.product_id);
+    console.log("Product:", product);
+    
+    let variant = null;
+    let price = undefined;
+    
+    // Check if price was explicitly provided in req.body
+    const hasPriceInRequest = item.price !== undefined && item.price !== null;
+    
+    if (hasPriceInRequest) {
+        // Use price from req.body
+        price = parseFloat(item.price);
+        console.log("Using price from request:", price);
+    }
+    console.log(" product.productType ", PRODUCT_TYPES.VARIABLE);
+    if (product.productType === PRODUCT_TYPES.VARIABLE) {
+        if (item.product_variant_id) {
+            variant = product.variants.id(item.product_variant_id);
+            if (!variant) {
+                throw new Error(`Variant ${item.product_variant_id} not found`);
+            }
+            
+            // If price wasn't provided in request, get from variant
+            if (!hasPriceInRequest) {
+                // Use special price if available, otherwise regular price
+                price = parseFloat(variant.variant_specialPrice || variant.variant_price);
+                console.log("Using variant price from database:", price);
+            }
+        } else {
+            throw new Error(`Variant ID required for variable product ${product.name}`);
         }
-
-        // Check if user exists
-        const userExists = await User.findById(user_id);
-        if (!userExists) {
-            return res.status(404).json({
-                success: false,
-                message: 'User not found'
-            });
+    } else if (product.productType === PRODUCT_TYPES.SIMPLE) {
+        // If price wasn't provided in request, get from simple product
+        if (!hasPriceInRequest) {
+            // Use special price if available, otherwise regular price
+            price = parseFloat(product.simpleProduct.sp_specialPrice || product.simpleProduct.sp_price);           
+            console.log("Using simple product price from database:", price);
         }
-
-        // Check if seller exists
-        const sellerExists = await User.findById(seller_id);
-        if (!sellerExists) {
-            return res.status(404).json({
-                success: false,
-                message: 'Seller not found'
-            });
+    }
+    
+    // Final validation
+    if (price === undefined || price === null || isNaN(price) || price <= 0) {
+        throw new Error(`Invalid price for product ${product.name}. Price: ${price}`);
+    }
+    console.log("Final price used:", price);
+    
+    const sub_total = price * item.quantity;
+    
+    // Create better variant name
+    let variantName = product.name;
+    if (variant) {
+        variantName = `${product.name} - ${variant.variant_sku || 'Variant'}`;
+    }
+    
+    return {
+        ...item,
+        price,
+        sub_total,
+        product_name: product.name,
+        variant_name: variantName,
+        seller_id: product.seller_id || item.seller_id
+    };
+}));
+        console.log(" itemsWithDetails ", itemsWithDetails);
+        const itemsTotal = itemsWithDetails.reduce((sum, item) => sum + item.sub_total, 0);
+        console.log(" itemsTotal ", itemsTotal);
+        const promoDiscount = parseFloat(promo_details?.discount) || 0;
+        
+        // Determine final delivery charge based on minimum free delivery amount
+        let finalDeliveryCharge = areaDeliveryCharge;
+        console.log(" finalDeliveryCharge ", finalDeliveryCharge);
+        console.log(" minimumFreeDeliveryAmount ", minimumFreeDeliveryAmount);
+        if (minimumFreeDeliveryAmount > 0 && itemsTotal >= minimumFreeDeliveryAmount) {
+            finalDeliveryCharge = 0; // Free delivery if order meets minimum
         }
-
-        // Check if product variant exists
-        const productVariantExists = await ProductVariant.findById(product_variant_id);
-        if (!productVariantExists) {
-            return res.status(404).json({
-                success: false,
-                message: 'Product variant not found'
-            });
-        }
-
-        // Calculate sub_total
-        const finalPrice = discounted_price || price;
-        const subTotal = finalPrice * quantity;
-        const taxAmount = (subTotal * tax_percent) / 100;
-
-        // Create order item
-        const orderItem = new OrderItem({
-            order_id,
+        
+        // Calculate totals using area delivery charge
+        const total = itemsTotal + 
+                     finalDeliveryCharge - 
+                     (parseFloat(discount) || 0) - 
+                     promoDiscount + 
+                     (parseFloat(tax_amount) || 0);
+        
+        // Create Order
+        const order = new Order({
             user_id,
-            seller_id,
-            product_variant_id,
-            product_name: product_name.trim(),
-            variant_name: variant_name?.trim() || null,
-            quantity,
-            price,
-            discounted_price: discounted_price || null,
-            tax_percent,
-            tax_amount: taxAmount,
-            discount,
-            sub_total: subTotal,
-            admin_commission_amount,
-            seller_commission_amount,
+            address_id,
+            mobile,
+            address: address || userAddress.address,
+           location: location || userAddress.location,
+            total: itemsTotal,
+            delivery_charge: finalDeliveryCharge,
+            discount: discount || 0,
+           promo_details: promo_details ? {
+                code: promo_details.code,
+                discount: parseFloat(promo_details.discount) || 0,
+                discount_type: promo_details.discount_type || 'fixed'
+            } : undefined,
+           tax_amount: parseFloat(tax_amount) || 0,
+            total_payable: total,
+            final_total: total,
+            payment: {
+                method: payment_method,
+                status: payment_method === PaymentMethod.COD ? 'pending' : 'pending'
+            },
+            delivery_info: delivery_info || {},
+            status: 'received',
+            status_timestamps: {
+                received: new Date()
+            }
+        });
+        
+        await order.save({ session });
+        
+        // Create Order Items
+        const orderItems = itemsWithDetails.map(item => ({
+            user_id,
+            order_id: order._id,
+            seller_id: item.seller_id,
+            product_id: item.product_id,
+            product_variant_id: item.product_variant_id,
+            product_name: item.product_name,
+            variant_name: item.variant_name,
+            quantity: item.quantity,
+            price: item.price,
+            discounted_price: parseFloat(item.discounted_price) || item.price,
+           tax_percent: parseFloat(item.tax_percent) || 0,
+          tax_amount: parseFloat(item.tax_amount) || 0,
+            discount: parseFloat(item.discount) || 0,
+            sub_total: item.sub_total,
             active_status: 'awaiting',
             status_history: [{
                 status: 'awaiting',
                 timestamp: new Date()
             }]
-        });
-
-        await orderItem.save();
-
-        // Populate for response
-        const populatedItem = await OrderItem.findById(orderItem._id)
-            .populate('order_id', 'order_number total status')
-            .populate('seller_id', 'username email mobile')
-            .populate('product_variant_id', 'sku stock')
-            .lean();
-
-        res.status(201).json({
-            success: true,
-            message: 'Order item created successfully',
-            data: populatedItem
-        });
-
-    } catch (error) {
-        console.error('Error creating order item:', error);
+        }));
         
-        if (error.name === 'ValidationError') {
-            const messages = Object.values(error.errors).map(err => err.message);
-            return res.status(400).json({
-                success: false,
-                message: 'Validation failed',
-                errors: messages
-            });
+        await OrderItem.insertMany(orderItems, { session });
+        
+        // Update product stock (important!)
+        for (const item of itemsWithDetails) {
+            const product = await Product.findById(item.product_id).session(session);
+            
+            if (product.productType === PRODUCT_TYPES.SIMPLE) {
+                product.simpleProduct.sp_totalStock -= item.quantity;
+                if (product.simpleProduct.sp_totalStock <= 0) {
+                    product.simpleProduct.sp_stockStatus = STOCK_STATUS.OUT_OF_STOCK;
+                }
+            } else if (product.productType === PRODUCT_TYPES.VARIABLE) {
+                const variant = product.variants.id(item.product_variant_id);
+                if (variant) {
+                    variant.variant_totalStock -= item.quantity;
+                    if (variant.variant_totalStock <= 0) {
+                        variant.variant_stockStatus = STOCK_STATUS.OUT_OF_STOCK;
+                    }
+                }
+            }
+            
+            await product.save({ session });
         }
         
+        await session.commitTransaction();
+        
+        res.status(201).json({
+            success: true,
+            message: 'Order created successfully',
+            data: { 
+                order_id: order._id,
+                order_number: order.order_number,
+                delivery_charge: finalDeliveryCharge,
+                total: total
+            }
+        });
+        
+    } catch (error) {
+        console.error("Order creation error:", error);
+        await session.abortTransaction();
         res.status(500).json({
             success: false,
-            message: 'Failed to create order item',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+            message: 'Failed to create order',
+            error: error.message
         });
+    } finally {
+        session.endSession();
     }
 };
 
@@ -448,74 +594,39 @@ const getAllOrderItems = async (req, res) => {
 
 // 4. READ - Get order item by ID
 const getOrderItemById = async (req, res) => {
-    try {
-        const { id } = req.params;
-
-        // Validate ID
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid Order Item ID format'
-            });
-        }
-
-        // Get order item with populated data
-        const orderItem = await OrderItem.findById(id)
-            .populate('order_id', 'order_number status user_id address date_added')
-            .populate('seller_id', 'username email mobile shop_name')
-            .populate('user_id', 'username email mobile')
-            .populate('delivery_boy_id', 'username mobile vehicle_number')
-            .populate('product_variant_id', 'sku price stock product_id')
-            .populate({
-                path: 'product_variant_id',
-                populate: {
-                    path: 'product_id',
-                    select: 'name category brand images'
-                }
-            })
-            .populate('updated_by', 'username email')
-            .lean();
-
-        if (!orderItem) {
-            return res.status(404).json({
-                success: false,
-                message: 'Order item not found'
-            });
-        }
-
-        // Calculate commission percentages
-        const totalAmount = orderItem.sub_total;
-        const commissionInfo = {
-            admin_commission_percent: totalAmount > 0 ? 
-                (orderItem.admin_commission_amount / totalAmount) * 100 : 0,
-            seller_commission_percent: totalAmount > 0 ? 
-                (orderItem.seller_commission_amount / totalAmount) * 100 : 0,
-            seller_payout: totalAmount - orderItem.admin_commission_amount
-        };
-
-        res.status(200).json({
-            success: true,
-            message: 'Order item retrieved successfully',
-            data: {
-                ...orderItem,
-                commission_info: commissionInfo,
-                financial_summary: {
-                    item_total: orderItem.sub_total,
-                    tax_amount: orderItem.tax_amount,
-                    discount_amount: orderItem.discount,
-                    final_amount: orderItem.sub_total + orderItem.tax_amount - orderItem.discount
-                }
-            }
+   try {
+      const { order_id } = req.params;
+      const user_id = req.user.id;
+      
+      const order = await Order.findOne({ 
+        _id: order_id,
+        user_id 
+      }).lean();
+      
+      if (!order) {
+        return res.status(404).json({
+          success: false,
+          message: 'Order not found'
         });
-
+      }
+      
+      const items = await OrderItem.find({ order_id })
+        .populate('product_variant_id', 'images attributes')
+        .populate('seller_id', 'name email');
+      
+      res.json({
+        success: true,
+        data: { ...order, items }
+      });
+      
     } catch (error) {
-        console.error('Error fetching order item:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to fetch order item'
-        });
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch order details',
+        error: error.message
+      });
     }
-};
+}
 
 // 5. READ - Get order items by order ID
 const getOrderItemsByOrder = async (req, res) => {
@@ -1197,6 +1308,405 @@ const getSellerPerformance = async (req, res) => {
     }
 };
 
+//11. GET ALL THE ORDER OF THE USER
+const getUserOrders = async (req, res) => {
+    try {
+      const user_id = req.user.id;
+      const { page = 1, limit = 10, status } = req.query;
+      
+      const query = { user_id };
+      if (status) query.status = status;
+      
+      const orders = await Order.find(query)
+        .sort({ createdAt: -1 })
+        .limit(limit * 1)
+        .skip((page - 1) * limit)
+        .lean();
+      
+      const count = await Order.countDocuments(query);
+      
+      // Get order items for each order
+      const ordersWithItems = await Promise.all(
+        orders.map(async (order) => {
+          const items = await OrderItem.find({ order_id: order._id });
+          return { ...order, items };
+        })
+      );
+      
+      res.json({
+        success: true,
+        data: ordersWithItems,
+        pagination: {
+          total: count,
+          page: parseInt(page),
+          pages: Math.ceil(count / limit)
+        }
+      });
+      
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch orders',
+        error: error.message
+      });
+    }
+}
+
+//12. update order status
+const updateOrderStatus = async (req, res) => {
+    try {
+      const { order_id } = req.params;
+      const { status } = req.body;
+      
+      const order = await Order.findById(order_id);
+      
+      if (!order) {
+        return res.status(404).json({
+          success: false,
+          message: 'Order not found'
+        });
+      }
+      
+      order.status = status;
+      await order.save(); // Pre-save hook will update timestamps
+      
+      res.json({
+        success: true,
+        message: `Order status updated to ${status}`,
+        data: order
+      });
+      
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to update order status',
+        error: error.message
+      });
+    }
+}
+
+//13. ASSIGN DELIVERY BOY
+const assignDeliveryBoy = async (req, res) => {
+    try {
+      const { order_id } = req.params;
+      const { delivery_boy_id, time_slot, date } = req.body;
+      
+      const order = await Order.findById(order_id);
+      
+      if (!order) {
+        return res.status(404).json({
+          success: false,
+          message: 'Order not found'
+        });
+      }
+      
+      order.delivery_info.boy_id = delivery_boy_id;
+      order.delivery_info.assigned_at = new Date();
+      order.delivery_info.time_slot = time_slot;
+      order.delivery_info.date = date;
+      order.delivery_info.otp = Math.floor(1000 + Math.random() * 9000);
+      
+      await order.save();
+      
+      // Update all order items
+      await OrderItem.updateMany(
+        { order_id },
+        { delivery_boy_id }
+      );
+      
+      res.json({
+        success: true,
+        message: 'Delivery boy assigned successfully',
+        data: { otp: order.delivery_info.otp }
+      });
+      
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to assign delivery boy',
+        error: error.message
+      });
+    }
+}
+
+//14. verify delivery otp
+const verifyDeliveryOTP = async (req, res) => {
+    try {
+      const { order_id } = req.params;
+      const { otp } = req.body;
+      const delivery_boy_id = req.user.id;
+      
+      const order = await Order.findOne({
+        _id: order_id,
+        'delivery_info.boy_id': delivery_boy_id
+      });
+      
+      if (!order) {
+        return res.status(404).json({
+          success: false,
+          message: 'Order not found or unauthorized'
+        });
+      }
+      
+      if (order.delivery_info.otp !== parseInt(otp)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid OTP'
+        });
+      }
+      
+      order.delivery_info.otp_verified = true;
+      order.status = 'delivered';
+      await order.save();
+      
+      // Update all items to delivered
+      await OrderItem.updateMany(
+        { order_id },
+        { 
+          active_status: 'delivered',
+          $push: {
+            status_history: {
+              status: 'delivered',
+              timestamp: new Date()
+            }
+          }
+        }
+      );
+      
+      res.json({
+        success: true,
+        message: 'Order delivered successfully'
+      });
+      
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to verify OTP',
+        error: error.message
+      });
+    }
+}
+
+//15. cancel orders
+const cancelOrder = async (req, res)=>  {
+    try {
+      const { order_id } = req.params;
+      const { reason } = req.body;
+      const user_id = req.user.id;
+      
+      const order = await Order.findOne({
+        _id: order_id,
+        user_id
+      });
+      
+      if (!order) {
+        return res.status(404).json({
+          success: false,
+          message: 'Order not found'
+        });
+      }
+      
+      if (['shipped', 'delivered'].includes(order.status)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Cannot cancel order in current status'
+        });
+      }
+      
+      order.status = 'cancelled';
+      order.cancellation = {
+        reason,
+        initiated_by: 'customer',
+        user_id,
+        refund_status: order.payment.status === 'paid' ? 'pending' : 'processed',
+        refund_amount: order.payment.status === 'paid' ? order.final_total : 0
+      };
+      
+      await order.save();
+      
+      // Update all items
+      await OrderItem.updateMany(
+        { order_id },
+        { 
+          active_status: 'cancelled',
+          $push: {
+            status_history: {
+              status: 'cancelled',
+              timestamp: new Date()
+            }
+          }
+        }
+      );
+      
+      res.json({
+        success: true,
+        message: 'Order cancelled successfully'
+      });
+      
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to cancel order',
+        error: error.message
+      });
+    }
+}
+
+//16. get seller orders
+const getSellerOrders =  async (req, res) => {
+    try {
+      const seller_id = req.user.id;
+      const { page = 1, limit = 10, active_status } = req.query;
+      
+      const query = { seller_id };
+      if (active_status) query.active_status = active_status;
+      
+      const items = await OrderItem.find(query)
+        .populate('order_id')
+        .populate('product_variant_id', 'images')
+        .sort({ createdAt: -1 })
+        .limit(limit * 1)
+        .skip((page - 1) * limit);
+      
+      const count = await OrderItem.countDocuments(query);
+      
+      res.json({
+        success: true,
+        data: items,
+        pagination: {
+          total: count,
+          page: parseInt(page),
+          pages: Math.ceil(count / limit)
+        }
+      });
+      
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch seller orders',
+        error: error.message
+      });
+    }
+}
+
+//17. get delivery boy orders
+ const getDeliveryBoyOrders = async (req, res) => {
+    try {
+      const delivery_boy_id = req.user.id;
+      const { status } = req.query;
+      
+      const query = { 'delivery_info.boy_id': delivery_boy_id };
+      if (status) query.status = status;
+      
+      const orders = await Order.find(query)
+        .sort({ 'delivery_info.date': 1 })
+        .lean();
+      
+      const ordersWithItems = await Promise.all(
+        orders.map(async (order) => {
+          const items = await OrderItem.find({ order_id: order._id });
+          return { ...order, items };
+        })
+      );
+      
+      res.json({
+        success: true,
+        data: ordersWithItems
+      });
+      
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch delivery orders',
+        error: error.message
+      });
+    }
+}
+
+//18. process refund
+const processRefund = async (req, res) => {
+    try {
+      const { order_id } = req.params;
+      
+      const order = await Order.findById(order_id);
+      
+      if (!order || !order.cancellation) {
+        return res.status(404).json({
+          success: false,
+          message: 'Order or cancellation not found'
+        });
+      }
+      
+      // Process refund logic here (integrate with payment gateway)
+      order.cancellation.refund_status = 'processed';
+      order.payment.status = 'refunded';
+      
+      await order.save();
+      
+      res.json({
+        success: true,
+        message: 'Refund processed successfully'
+      });
+      
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to process refund',
+        error: error.message
+      });
+    }
+}
+
+const getOrderAnalytics = async (req, res) => {
+    try {
+      const { start_date, end_date } = req.query;
+      
+      const dateFilter = {};
+      if (start_date && end_date) {
+        dateFilter.createdAt = {
+          $gte: new Date(start_date),
+          $lte: new Date(end_date)
+        };
+      }
+      
+      const analytics = await Order.aggregate([
+        { $match: dateFilter },
+        {
+          $group: {
+            _id: '$status',
+            count: { $sum: 1 },
+            totalRevenue: { $sum: '$final_total' }
+          }
+        }
+      ]);
+      
+      const totalOrders = await Order.countDocuments(dateFilter);
+      const totalRevenue = await Order.aggregate([
+        { $match: dateFilter },
+        { $group: { _id: null, total: { $sum: '$final_total' } } }
+      ]);
+      
+      res.json({
+        success: true,
+        data: {
+          totalOrders,
+          totalRevenue: totalRevenue[0]?.total || 0,
+          statusBreakdown: analytics
+        }
+      });
+      
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch analytics',
+        error: error.message
+      });
+    }
+}
+
+
+
+
 // ================= HELPER FUNCTIONS =================
 
 // Check if item status transition is valid
@@ -1225,5 +1735,14 @@ module.exports = {
     getOrderItemById,
     getAllOrderItems,
     bulkCreateOrderItems,
-    createOrderItem
+    createOrderItem,
+    getUserOrders,
+    getOrderAnalytics,
+    processRefund,
+    getDeliveryBoyOrders,
+    getSellerOrders,
+    cancelOrder,
+    updateOrderStatus,
+    assignDeliveryBoy,
+    verifyDeliveryOTP
 }

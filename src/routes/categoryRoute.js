@@ -6,14 +6,14 @@ const { authenticate, authorizePermission } = require("../middleware/authMiddlew
 
 router
   .route("/")
-  .get(pagination, Category.getAllCategories)
+  .get(authenticate,authorizePermission("can_manage_products"),pagination, Category.getAllCategories)
   .post( authenticate,authorizePermission("can_manage_products"),Category.createCategory);
 
 router
   .route("/:id")
-  .get(Category.getCategoryById)
-  .put(Category.updateCategory)
-  .put(Category.checkCategoryStatus)
-  .delete(Category.deleteCategory);
+  .get(authenticate,authorizePermission("can_manage_products"),Category.getCategoryById)
+  .put(authenticate,authorizePermission("can_manage_products"),Category.updateCategory)
+  .patch(authenticate,authorizePermission("can_manage_products"),Category.checkCategoryStatus)
+  .delete(authenticate,authorizePermission("can_manage_products"),Category.deleteCategory);
 
 module.exports = router;

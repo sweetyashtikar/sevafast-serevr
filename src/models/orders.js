@@ -14,7 +14,8 @@ const PaymentMethod = {
     PAYPAL: 'PayPal',
     BANK_TRANSFER: 'bank_transfer',
     RAZORPAY: 'Razorpay',
-    STRIPE: 'Stripe'
+    STRIPE: 'Stripe',
+    UPI : 'upi'
 }
 
 const PaymentStatus = {
@@ -37,6 +38,11 @@ const orderSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Address',
         index:true
+    },
+    order_number :{
+        type: String,
+        unique: true,
+        index: true
     },
     
     // Snapshot of contact/location at time of order
@@ -149,13 +155,18 @@ const orderSchema = new mongoose.Schema({
     timestamps: true
 });
 
-// Virtual for formatted order number
-orderSchema.virtual('order_number').get(function() {
-    return `ORD${this.date_added.getFullYear()}${String(this._id).slice(-6).toUpperCase()}`;
-});
-
-// Pre-save to update status timestamps
 orderSchema.pre('save', function(next) {
+    // Generate order number only for new documents
+    if (this.isNew && !this.order_number) {
+        const year = new Date().getFullYear();
+        const timestamp = Date.now().toString().slice(-6);
+        const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+        
+        // Generate a unique order number without needing _id
+        this.order_number = `ORD${year}${timestamp}${random}`;
+    }
+    
+    // Update status timestamps
     if (this.isModified('status') && this.status) {
         const statusField = this.status.toLowerCase();
         if (!this.status_timestamps[statusField]) {
@@ -163,20 +174,39 @@ orderSchema.pre('save', function(next) {
             this.status_timestamps[statusField] = new Date();
         }
     }
-      // Auto-set delivered_at when status changes to delivered
+    
+    // Auto-set delivered_at when status changes to delivered
     if (this.isModified('status') && this.status === OrderStatus.DELIVERED) {
         this.delivery_info.delivered_at = new Date();
-        this.payment.status = PaymentStatus.PAID; // Auto-mark as paid for COD
+        this.payment.status = PaymentStatus.PAID;
     }
-    
-    next();
 });
 
-// Indexes
-orderSchema.index({ user_id: 1, date_added: -1 });
+// Add post-save middleware to update order number with actual _id
+orderSchema.post('save', function(doc, next) {
+    // If order number still has TEMP, update it with actual _id
+    if (doc.order_number && doc.order_number.includes('TEMP')) {
+        const year = new Date().getFullYear();
+        const shortId = String(doc._id).slice(-6).toUpperCase();
+        doc.order_number = `ORD${year}${shortId}`;
+        
+        // Save the updated order number
+        doc.constructor.findByIdAndUpdate(doc._id, { 
+            order_number: doc.order_number 
+        }).then(() => next()).catch(next);
+    } else {
+        next();
+    }
+});
+
+// Fix the indexes - replace date_added with createdAt
+orderSchema.index({ user_id: 1, createdAt: -1 }); // Fixed this line
 orderSchema.index({ 'payment.status': 1 });
 orderSchema.index({ 'delivery_info.boy_id': 1, status: 1 });
 orderSchema.index({ 'delivery_info.date': 1 });
 orderSchema.index({ 'cancellation.refund_status': 1 });
 
 module.exports = mongoose.model('Order', orderSchema);
+module.exports.OrderStatus = OrderStatus;
+module.exports.PaymentMethod = PaymentMethod;
+module.exports.PaymentStatus = PaymentStatus;

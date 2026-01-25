@@ -8,10 +8,10 @@ const categorySchema = new mongoose.Schema({
     },
     // Self-referencing field: Points to another Category document
     // If it's a top-level category, this will be null
-    sub_category: {
+    sub_category: [{
        type: String,
         trim: true
-    },
+    }],
     slug: {
         type: String,
         required: true,

@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const { MONGODB_URI } = require('./src/env-variables');
+const cookieParser = require('cookie-parser');
 
 const { authenticate,authorizePermission} = require('./src/middleware/authMiddleware')
 
@@ -30,12 +31,19 @@ const sellerRoute = require('./src/routes/sellerRoute')
 const faqRoute = require('./src/routes/faqroute')
 const favouriteRoute = require('./src/routes/favouriteRoute')
 const productFaqRoute = require('./src/routes/productFAQRoute');
+const OrderItemRoute = require('./src/routes/orderItemRoute')
 
 
 
 /* Middleware */
-app.use(cors());
+app.use(cors({
+  origin: 'http://localhost:3000', // Your frontend URL
+  credentials: true, // Allow cookies to be sent
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
 app.use(express.json()); // 👈 body-parser replace (simple & modern)
+app.use(cookieParser());
 
 
 /* MongoDB Connection */
@@ -68,6 +76,7 @@ app.use('/api/seller', sellerRoute)
 app.use('/api/faq', faqRoute)
 app.use('/api/favourite', favouriteRoute)
 app.use('/api/product-faqs', productFaqRoute);
+app.use('/api/order', OrderItemRoute)
 
 
 

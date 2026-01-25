@@ -9,9 +9,7 @@ const {
 const Category = require("../models/category");
 const Tax = require("../models/tax");
 const AttributeValue = require("../models/attributeValue");
-const {
-  checkStatus
-} = require("../utils/sanitizer");
+const {checkStatus} = require("../utils/sanitizer");
 const {
   mapBasicInfo,
   mapCategorization,
@@ -49,11 +47,8 @@ const {
 const addProduct = async (req, res) => {
   try {
     const body = req.body;
+    const vendorId = req.body.vendorId;
 
-    // Get vendor ID from authenticated user
-    const vendorId = req.user._id;
-
-    // const category = await Category.findById( categoryId);
     const [validateCategory, validateTax, validateAtrributeValue] = await Promise.all([
         checkStatus(Category, body.categoryId),
         checkStatus(Tax, body.taxId),
@@ -80,7 +75,7 @@ const addProduct = async (req, res) => {
       ...mapPolicies(body),
       ...mapMedia(body),
       ...mapDigitalProduct(body, toBool),
-      ...mapSEO(body),
+      // ...mapSEO(body),
       status: body.status === undefined ? true : toBool(body.status),
     };
 

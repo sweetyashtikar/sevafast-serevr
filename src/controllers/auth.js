@@ -50,6 +50,11 @@ const LoginUser = async (req, res) => {
         .status(401)
         .json({ success: false, message: "Invalid credentials details" });
     }
+    if(user.active !== true){
+       return res
+        .status(401)
+        .json({ success: false, message: "Account is not active" });
+    }
 
     // 2. Check Password (Assuming you use bcrypt.compare in your User model methods)
     const isMatch = await user.comparePassword(password);
@@ -81,8 +86,9 @@ const LoginUser = async (req, res) => {
       success: true,
       message: "Login successfull",
       user: sanitizeUser(user),
+      token
     });
-  } catch (error) {
+  }catch (error) {
     console.log(error);
     res.status(500).json({ success: false, message: error.message });
   }
@@ -221,6 +227,7 @@ const resetPassword = async (req, res) => {
 };
 
 const LogoutUser = async (req, res) => {
+  console.log(req.body)
   try {
     clearTokenCookie(res);
 

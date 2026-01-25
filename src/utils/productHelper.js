@@ -19,7 +19,6 @@ function mapBasicInfo(body) {
     name: body.name,
     shortDescription: body.shortDescription,
     description: body.description,
-    extraDescription: body.extraDescription,
   };
 }
 
@@ -102,10 +101,10 @@ function mapMedia(body) {
 
 function mapDigitalProduct(body, toBool) {
   return {
-    downloadAllowed: toBool(body.downloadAllowed),
-    downloadLinkType: body.downloadLinkType,
-    downloadFile: body.downloadFile,
-    downloadLink: body.downloadLink,
+    // downloadAllowed: toBool(body.downloadAllowed),
+    // downloadLinkType: body.downloadLinkType,
+    // downloadFile: body.downloadFile,
+    // downloadLink: body.downloadLink,
   };
 }
 
@@ -174,23 +173,13 @@ function buildVariants(body, toInt, toFloat) {
   if (body.variants && Array.isArray(body.variants)) {
     return body.variants.map((variantData) => {
       const variant = {
-        // Pricing
+        variant_name: variantData.variant_name,
         variant_price: toFloat(variantData.variant_price || variantData.price),
-        variant_specialPrice:
-          variantData.variant_specialPrice || variantData.special_price
-            ? toFloat(
-                variantData.variant_specialPrice || variantData.special_price
-              )
-            : undefined,
+        variant_specialPrice: variantData.variant_specialPrice || variantData.special_price ? toFloat(variantData.variant_specialPrice || variantData.special_price): undefined,
 
         // Stock management
         variant_sku: variantData.variant_sku || variantData.sku || "",
-        variant_totalStock:
-          variantData.variant_totalStock || variantData.stock_quantity
-            ? toInt(
-                variantData.variant_totalStock || variantData.stock_quantity
-              )
-            : 0,
+        variant_totalStock:variantData.variant_totalStock || variantData.stock_quantity ? toInt(variantData.variant_totalStock || variantData.stock_quantity) : 0,
         variant_stockStatus:
           variantData.variant_stockStatus ||
           variantData.stock_status ||
@@ -247,7 +236,6 @@ function updateBasicInfo(product, body) {
   if (shouldUpdate(body.name)) product.name = body.name;
   if (shouldUpdate(body.shortDescription)) product.shortDescription = body.shortDescription;
   if (shouldUpdate(body.description)) product.description = body.description;
-  if (shouldUpdate(body.extraDescription)) product.extraDescription = body.extraDescription;
 }
 
 function updateCategorization(product, body, toArray) {
@@ -344,14 +332,14 @@ function updateSEO(product, body) {
 
 
 function updateDigitalProduct(product, body, toBool) {
-  if (shouldUpdate(body.downloadAllowed)) {
-    product.downloadAllowed = toBool(body.downloadAllowed);
-  }
-  if (shouldUpdate(body.downloadLinkType)) {
-    product.downloadLinkType = body.downloadLinkType;
-  }
-  if (shouldUpdate(body.downloadFile)) product.downloadFile = body.downloadFile;
-  if (shouldUpdate(body.downloadLink)) product.downloadLink = body.downloadLink;
+  // if (shouldUpdate(body.downloadAllowed)) {
+  //   product.downloadAllowed = toBool(body.downloadAllowed);
+  // }
+  // if (shouldUpdate(body.downloadLinkType)) {
+  //   product.downloadLinkType = body.downloadLinkType;
+  // }
+  // if (shouldUpdate(body.downloadFile)) product.downloadFile = body.downloadFile;
+  // if (shouldUpdate(body.downloadLink)) product.downloadLink = body.downloadLink;
 }
 
 function updateProductTypeData(product, body, toInt, toFloat, toArray, isDefined) {

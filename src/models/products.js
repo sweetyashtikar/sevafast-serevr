@@ -13,14 +13,13 @@ const {
 // Variant sub-schema for variable products
 const variantSchema = new mongoose.Schema(
   {
-    // // Variant identification
-    // variantIds: {
-    //   type: String,
-    //   required: true,
-    //   trim: true,
-    //   // Example: "3 5" means attribute_value_id 3 and 5
-    //   // Like "Size: Large (id=3)" + "Color: Red (id=5)"
-    // },
+    variant_name: {
+      type: String,
+      required: true,
+      trim: true,
+      // Example: "3 5" means attribute_value_id 3 and 5
+      // Like "Size: Large (id=3)" + "Color: Red (id=5)"
+    },
 
     // Pricing
     variant_price: {
@@ -121,10 +120,6 @@ const productSchema = new mongoose.Schema(
       trim: true,
     },
 
-    extraDescription: {
-      type: String,
-      trim: true,
-    },
 
     // ==========================================
     // CATEGORIZATION & CLASSIFICATION
@@ -133,7 +128,7 @@ const productSchema = new mongoose.Schema(
     categoryId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Category",
-      // required: [true, "Category is required"],
+       required: [true, "Category is required"],
       index: true,
     },
 
@@ -243,10 +238,7 @@ const productSchema = new mongoose.Schema(
         type: Number,
         min: 0,
         required: function () {
-          return (
-            this.productType === PRODUCT_TYPES.SIMPLE ||
-            this.productType === PRODUCT_TYPES.DIGITAL
-          );
+          return (this.productType === PRODUCT_TYPES.SIMPLE || this.productType === PRODUCT_TYPES.DIGITAL );
         },
       },
 
@@ -323,7 +315,8 @@ const productSchema = new mongoose.Schema(
     deliverableType: {
       type: String,
       enum: Object.values(DELIVERABLE_TYPES),
-      default: DELIVERABLE_TYPES.ALL,
+      default: DELIVERABLE_TYPES.NONE,
+      required: true,
     },
 
     deliverableZipcodes: [
@@ -332,11 +325,6 @@ const productSchema = new mongoose.Schema(
         trim: true,
       },
     ],
-
-    pickupLocation: {
-      type: String,
-      trim: true,
-    },
 
     // Dimensions (for simple products or default for variable)
     dimensions: {
@@ -387,7 +375,7 @@ const productSchema = new mongoose.Schema(
 
     mainImage: {
       type: String,
-      // required: [true, "Main product image is required"],
+      //required: [true, "Main product image is required"],
       trim: true,
     },
 
@@ -416,17 +404,17 @@ const productSchema = new mongoose.Schema(
     // DIGITAL PRODUCT SPECIFICS
     // ==========================================
 
-    downloadAllowed: {
-      type: Boolean,
-      default: false,
-    },
+    // downloadAllowed: {
+    //   type: Boolean,
+    //   default: false,
+    // },
 
     downloadLinkType: {
       type: String,
       enum: Object.values(DOWNLOAD_LINK_TYPES),
-      required: function () {
-        return this.productType === PRODUCT_TYPES.DIGITAL;
-      },
+      // required: function () {
+      //   return this.productType === PRODUCT_TYPES.DIGITAL;
+      // },
     },
 
     downloadFile: {
@@ -499,30 +487,6 @@ const productSchema = new mongoose.Schema(
         default: 0,
       },
     },
-
-    // ==========================================
-    // SEO
-    // ==========================================
-
-    seo: {
-      metaTitle: {
-        type: String,
-        trim: true,
-        maxlength: 60,
-      },
-      metaDescription: {
-        type: String,
-        trim: true,
-        maxlength: 160,
-      },
-      metaKeywords: [
-        {
-          type: String,
-          trim: true,
-        },
-      ],
-    },
-
     // Soft delete
     isDeleted: {
       type: Boolean,
@@ -559,10 +523,7 @@ productSchema.index({ createdAt: -1 });
 
 // Get effective price (special price if available, otherwise regular price)
 productSchema.virtual("effectivePrice").get(function () {
-  if (
-    this.productType === PRODUCT_TYPES.SIMPLE ||
-    this.productType === PRODUCT_TYPES.DIGITAL
-  ) {
+  if (this.productType === PRODUCT_TYPES.SIMPLE || this.productType === PRODUCT_TYPES.DIGITAL ) {
     return this.simpleProduct.sp_specialPrice || this.simpleProduct.sp_price;
   }
   return null;
@@ -570,15 +531,10 @@ productSchema.virtual("effectivePrice").get(function () {
 
 // Get discount percentage
 productSchema.virtual("discountPercentage").get(function () {
-  if (
-    this.productType === PRODUCT_TYPES.SIMPLE ||
-    this.productType === PRODUCT_TYPES.DIGITAL
-  ) {
+  if (this.productType === PRODUCT_TYPES.SIMPLE || this.productType === PRODUCT_TYPES.DIGITAL ) {
     if (this.simpleProduct.sp_specialPrice && this.simpleProduct.sp_price) {
-      const discount =
-        ((this.simpleProduct.sp_price - this.simpleProduct.sp_specialPrice) /
-          this.simpleProduct.sp_price) *
-        100;
+      const discount =((this.simpleProduct.sp_price - this.simpleProduct.sp_specialPrice) /this.simpleProduct.sp_price) *100;
+
       return Math.round(discount);
     }
   }
@@ -617,10 +573,7 @@ productSchema.pre("save", function (next) {
 
 // Validate deliverable zipcodes based on deliverable type
 productSchema.pre("save", function (next) {
-  if (
-    this.deliverableType === DELIVERABLE_TYPES.INCLUDE ||
-    this.deliverableType === DELIVERABLE_TYPES.EXCLUDE
-  ) {
+  if (this.deliverableType === DELIVERABLE_TYPES.INCLUDE || this.deliverableType === DELIVERABLE_TYPES.EXCLUDE) {
     if (!this.deliverableZipcodes || this.deliverableZipcodes.length === 0) {
       return next(
         new Error(
@@ -676,6 +629,7 @@ productSchema.methods.updateStock = function (quantity) {
     this.simpleProduct.sp_totalStock -= quantity;
     if (this.simpleProduct.sp_totalStock <= 0) {
       this.simpleProduct.sp_stockStatus  = STOCK_STATUS.OUT_OF_STOCK;
+      
     }
   }
 };
@@ -691,6 +645,7 @@ productSchema.methods.updateVariantStock = function (variantIds, quantity) {
         variant.variant_totalStock  -= quantity;
         if (variant.variant_totalStock  <= 0) {
           variant.variant_stockStatus  = STOCK_STATUS.OUT_OF_STOCK;
+          variant.variant_isActive  = false;
         }
       }
     } else {

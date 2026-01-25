@@ -33,9 +33,13 @@ const orderItemSchema = new mongoose.Schema(
       ref: "User",
       default: null,
     },
+    product_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Product",
+      required: true,
+    },
     product_variant_id: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "ProductVariant",
       required: true,
     },
 

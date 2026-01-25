@@ -9,6 +9,11 @@ const taxSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    amount :{
+      type: Number,
+      required: true,
+      min: 0,
+    },
     // Stored as a number for direct calculation (e.g., 5.0 for 5%)
     percentage: {
       type: Number,

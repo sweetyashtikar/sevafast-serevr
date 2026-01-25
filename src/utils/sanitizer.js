@@ -107,12 +107,31 @@ const checkStatus = async (model, ids) => {
     return validateStatus._id;
 }
 
+const checkId  = async(model, ids) => {
+
+    if(Array.isArray(ids)){
+        const existingDocs = await model.find({
+            _id : {$in : ids}
+        }).select('_id')
+        if(existingDocs.length !== ids.length){
+            return null;
+        }
+        return existingDocs.map(doc => doc._id);
+    }
+    const validateId = await model.findById(ids).select('_id');
+    if (!validateId) {
+        return null; // Return null for invalid ID
+    }
+    return validateId._id;
+}
+
 module.exports = {
     sanitizeUser,
     sanitizeUserForPublic,
     sanitizeUserForAdmin,
     sanitizeUserForSelf,
-    checkStatus
+    checkStatus,
+    checkId
 
 
 };

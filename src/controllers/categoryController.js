@@ -2,15 +2,18 @@ const Category = require('../models/category');
 
 // 1. Create Category
 const createCategory = async (req, res) => {
+    console.log("Request Body:", req.body); 
     try {
         const { name, sub_category, image, banner, row_order } = req.body;
 
         // Auto-generate slug from name: "Men's Fashion" -> "mens-fashion"
         const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
 
+        const subCategoryArray = Array.isArray(sub_category) ? sub_category : (sub_category ? [sub_category] : []);
+
         const newCategory = new Category({
             name,
-            sub_category,
+            sub_category : subCategoryArray,
             slug,
             image,
             banner,
@@ -94,9 +97,10 @@ const deleteCategory = async (req, res) => {
 //controller to check for the status of category
 const checkCategoryStatus = async (req,res) => {
     const id = req.params.id;
-    const {status} = req.body;
+    const {newStatus} = req.body;
+    console.log("Status:", newStatus);
     try{
-        const updateCategoryStatus = await Category.findById(id, {status : status});
+        const updateCategoryStatus = await Category.findByIdAndUpdate(id, {status : newStatus, new: true});
 
         if (!updateCategoryStatus) {
             return res.status(404).json({ success: false, message: "Category not found" });

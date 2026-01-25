@@ -5,6 +5,7 @@ const bcrypt = require('bcryptjs');
 
 // Create a new user
 const RegisterUser = async (req, res) => {    
+    console.log("req.body", req.body)
     try {
         const {  username, email, mobile, password, role, 
             latitude, longitude, address, city, pincode,
@@ -47,6 +48,9 @@ const RegisterUser = async (req, res) => {
             },
             zipcodes : zipcodes || [],
         };
+        if (findRole.role === "customer") {
+            userData.active = true;
+        }
 
         // 5. Handle Geo-Location (GeoJSON format)
         if (latitude && longitude) {

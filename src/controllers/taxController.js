@@ -3,14 +3,15 @@ const Tax = require("../models/tax");
 // CREATE: Add a new tax entry
 const createTax = async (req, res) => {
   try {
-    const { title, percentage } = req.body;
+    const { title, percentage, amount } = req.body;
 
     const tax = await Tax.findOne({title})
     if(tax) return res.status(400).json({ success: false, message: "Tax title already exists" });
 
     const newTax = await Tax.create({
       title,
-      percentage
+      percentage,
+      amount
     });
 
     res.status(201).json({
@@ -71,14 +72,15 @@ const getTaxById = async (req, res) => {
 // UPDATE: Update tax details
 const updateTax = async (req, res) => {
     const id = req.params.id
-    const { title,percentage,status} = req.body
+    const { title,percentage,status, amount} = req.body
   try {
     const tax = await Tax.findByIdAndUpdate(
       id,
       {
         title : title,
         percentage:percentage,
-        status : status
+        status : status,
+        amount: amount
       },
       { new: true, runValidators: true }
     );
