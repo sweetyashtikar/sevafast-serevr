@@ -19,10 +19,10 @@ const {pagination} = require('../middleware/pagination')
 // Standard REST Routes
 router.route('/')
     .post( authenticate,authorizePermission("can_manage_products"),createAttributeSet)
-    .get(pagination,getAllAttributeSets);
+    .get( authenticate,authorizePermission("can_manage_products"),pagination,getAllAttributeSets);
 
 router.route('/:id')
-    .get(getAttributeSetById)
+    .get( authenticate,authorizePermission("can_manage_products"),getAttributeSetById)
     .put(authenticate,authorizePermission("can_manage_products"),updateAttributeSet)
     .delete(authenticate,authorizePermission("can_manage_products"),deleteAttributeSet);
 

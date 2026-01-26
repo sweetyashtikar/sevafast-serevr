@@ -16,10 +16,10 @@ const {pagination} = require('../middleware/pagination')
 
 router.route("/")
     .post( authenticate,authorizePermission("can_manage_products"),createAttribute)
-    .get(pagination,getAllAttributes);
+    .get( authenticate,authorizePermission("can_manage_products"),pagination,getAllAttributes);
 
 router.route("/:id")
-    .get(getAttributeById)
+    .get( authenticate,authorizePermission("can_manage_products"),getAttributeById)
     .put( authenticate,authorizePermission("can_manage_products"),updateAttribute)
     .delete( authenticate,authorizePermission("can_manage_products"),deleteAttribute);
 

@@ -80,13 +80,13 @@ const LoginUser = async (req, res) => {
     user.last_login = new Date();
     await user.save({ validateBeforeSave: false });
 
-    setTokenCookie(res, token);
+    // setTokenCookie(res, token);
 
     res.status(200).json({
       success: true,
       message: "Login successfull",
       user: sanitizeUser(user),
-      token
+      token 
     });
   }catch (error) {
     console.log(error);
