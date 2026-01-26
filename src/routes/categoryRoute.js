@@ -4,6 +4,8 @@ const router = express.Router();
 const { pagination } = require("../middleware/pagination");
 const { authenticate, authorizePermission } = require("../middleware/authMiddleware");
 
+router.get("/status-true", pagination, Category.getAllCategoriesStatusTrue);
+
 router
   .route("/")
   .get(authenticate,authorizePermission("can_manage_products"),pagination, Category.getAllCategories)

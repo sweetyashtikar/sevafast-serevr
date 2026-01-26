@@ -50,7 +50,7 @@ const LoginUser = async (req, res) => {
         .status(401)
         .json({ success: false, message: "Invalid credentials details" });
     }
-    if(user.active !== true){
+    if(user.status !== true){
        return res
         .status(401)
         .json({ success: false, message: "Account is not active" });

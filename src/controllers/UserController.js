@@ -75,6 +75,9 @@ const RegisterUser = async (req, res) => {
 const getAllUsers = async (req, res) => {
     try {
         const users = await User.find().populate('role');   
+        const nonAdminUsers = users.filter(user => 
+            user.role && user.role !== 'admin'
+    );
         res.status(200).json({success : true , data :nonAdminUsers});
     } catch (error) {
         res.status(500).json({ success: false ,message: error.message });

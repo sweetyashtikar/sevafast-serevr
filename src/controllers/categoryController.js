@@ -53,6 +53,33 @@ const getAllCategories = async (req, res) => {
     }
 };
 
+//for fropdown to get categories with status true
+const getAllCategoriesStatusTrue = async (req, res) => {
+    const { limit, offset, sort, searchQuery, filters } = req.paginationQuery;
+
+    const finalQuery = { status: true, ...searchQuery, ...filters };
+
+    try {
+        const categories = await Category.find(finalQuery)
+        .sort(sort)
+        .skip(offset)
+        .limit(limit);
+
+        const total = await Category.countDocuments(finalQuery);
+            
+        res.status(200).json({ 
+            success: true,
+            total,
+            limit,
+            offset, 
+            count: categories.length,
+            data: categories });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+
 // 3. Get Single Category & Increment Clicks
 const getCategoryById = async (req, res) => {
     const id = req.params.id
@@ -117,5 +144,6 @@ module.exports = {
     getCategoryById,
     updateCategory,
     deleteCategory,
-    checkCategoryStatus
+    checkCategoryStatus,
+    getAllCategoriesStatusTrue
 };
