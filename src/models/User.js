@@ -17,7 +17,7 @@ const userSchema = new mongoose.Schema(
     },
     ip_address: { type: String },
     image: { type: String }, // URL to the image
-    active: { type: Boolean, default: false },
+    status: { type: Boolean, default: false },
     fcm_id: { type: String }, // Firebase Cloud Messaging ID for notifications
     apikey: { type: String, select: false },
 

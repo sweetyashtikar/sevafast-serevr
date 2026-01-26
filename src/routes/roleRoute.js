@@ -13,7 +13,7 @@ const {pagination} = require("../middleware/pagination")
 // Route to create a new role
 
 router.route('/')
-    .get( authenticate,checkIfAdmin,pagination,Roles.getAllRoles)
+    .get(pagination,Roles.getAllRoles)
     .post(authenticate,checkIfAdmin,Roles.createRole);
 
 

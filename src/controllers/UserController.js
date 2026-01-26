@@ -81,6 +81,19 @@ const getAllUsers = async (req, res) => {
     }
 }
 
+const getAllVendors = async (req, res) => {
+    const vendorRole = await Roles.findOne({ role: 'vendor' });
+    if (!vendorRole) {
+        return res.status(404).json({ success: false, message: 'Vendor role not found' });
+    }
+    try {
+        const users = await User.find({ role: vendorRole._id }).populate('role');   
+        res.status(200).json({success : true , data :users});
+    } catch (error) {
+        res.status(500).json({ success: false ,message: error.message });
+    }
+}
+
 const updateUser = async (req, res) => {
     try {
         const { id } = req.params;
@@ -115,5 +128,6 @@ module.exports = {
     RegisterUser,
     getAllUsers,
     updateUser,
-    deleteUser
+    deleteUser,
+    getAllVendors
 };

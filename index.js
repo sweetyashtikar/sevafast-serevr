@@ -35,6 +35,7 @@ const OrderItemRoute = require('./src/routes/orderItemRoute')
 
 
 
+
 /* Middleware */
 app.use(cors({
   origin: 'http://localhost:3000', // Your frontend URL

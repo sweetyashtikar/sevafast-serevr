@@ -5,7 +5,7 @@ const router = express.Router();
 router.patch('/:model/:id' , async (req,res)=>{
     try{
     const {model, id} = req.params 
-    const {status} = req.body 
+    const {newStatus} = req.body 
 
     const modelName = model.charAt(0).toUpperCase() + model.slice(1)
 
@@ -17,7 +17,7 @@ router.patch('/:model/:id' , async (req,res)=>{
 
     const updateStatus = await TargetModel.findByIdAndUpdate(
         id,
-        {status, status},
+        {status: newStatus},
         {new :true, runValidators : true}
     )
     if (!updateStatus) {
@@ -29,10 +29,11 @@ router.patch('/:model/:id' , async (req,res)=>{
 
     res.status(200).json({
             success: true,
-            message: `${modelName} status updated to ${status}`,
+            message: `${modelName} status updated to ${newStatus}`,
             data: updateStatus
         });
     }catch (error) {
+        console.log(error)
         res.status(500).json({ success: false, message: error.message });
     }
 })
