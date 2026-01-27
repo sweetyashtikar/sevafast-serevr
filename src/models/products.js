@@ -541,19 +541,22 @@ productSchema.virtual("discountPercentage").get(function () {
   return 0;
 });
 
-// Check if product is in stock
 productSchema.virtual("inStock").get(function () {
   if (this.productType === PRODUCT_TYPES.SIMPLE) {
-    return this.simpleProduct.sp_stockStatus === STOCK_STATUS.IN_STOCK;
+    return this.simpleProduct?.sp_stockStatus === STOCK_STATUS.IN_STOCK;
   }
   if (this.productType === PRODUCT_TYPES.VARIABLE) {
     if (this.variantStockLevelType === VARIANT_STOCK_LEVEL_TYPES.PRODUCT_LEVEL) {
-      return this.productLevelStock.pls_stockStatus === STOCK_STATUS.IN_STOCK;
+      return this.productLevelStock?.pls_stockStatus === STOCK_STATUS.IN_STOCK;
     }
     // Check if any variant is in stock
-    return this.variants.some((v) => v.stockStatus === STOCK_STATUS.IN_STOCK);
+    return this.variants?.some((v) => v.stockStatus === STOCK_STATUS.IN_STOCK) || false;
   }
-  return false; // Digital products always "in stock"
+  // Digital products - you said they should always be "in stock"
+  if (this.productType === PRODUCT_TYPES.DIGITAL) {
+    return true; // Digital products are always in stock
+  }
+  return false;
 });
 
 // ==========================================

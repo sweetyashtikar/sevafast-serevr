@@ -8,6 +8,8 @@ const {
   checkIfAdmin
 } = require("../middleware/authMiddleware");
 const { pagination } = require("../middleware/pagination");
+const { uploadProductImages, uploadProductVideos } = require("../middleware/uploadconfig");
+
 
 // ==========================================
 // PUBLIC ROUTES (No authentication required)
@@ -26,7 +28,7 @@ router.get("/", productController.getAllProducts);
  * @desc    Get single product details
  * @access  Public
  */
-router.get("/:productId", productController.getProduct);
+router.get("/:productId", productController.getProductById);
 
 /**
  * @route   GET /api/products/category/:categoryId
@@ -81,8 +83,22 @@ router.post(
   "/",
   authenticate,
   authorizePermission("can_manage_products"),
+  uploadProductImages.fields([
+    { name: 'mainImage', maxCount: 1 },
+    { name: 'otherImages', maxCount: 10 }
+  ]),
   productController.addProduct
 );
+router.post(
+  "/",
+  authenticate,
+  authorizePermission("can_manage_products"),
+  //  uploadProductImages.array('otherImages', 10), // For array of files
+  // uploadProductImages.single('mainImage'), // For single file
+  productController.addProduct
+);
+
+
 
 /**
  * @route   PUT /api/products/:productId

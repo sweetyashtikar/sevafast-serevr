@@ -9,7 +9,7 @@ const {
 const Category = require("../models/category");
 const Tax = require("../models/tax");
 const AttributeValue = require("../models/attributeValue");
-const {checkStatus} = require("../utils/sanitizer");
+const { checkStatus, checkId } = require("../utils/sanitizer");
 const {
   mapBasicInfo,
   mapCategorization,
@@ -47,15 +47,50 @@ const {
 const addProduct = async (req, res) => {
   try {
     const body = req.body;
-    const vendorId = req.body.vendorId;
+    console.log("Add Product Request Body:", body);
+    console.log("Uploaded Files:", req.files);
+    const vendorId = req.user._id;
 
-    const [validateCategory, validateTax, validateAtrributeValue] = await Promise.all([
-        checkStatus(Category, body.categoryId),
-        checkStatus(Tax, body.taxId),
-        checkStatus(AttributeValue, body.attributeValues),
-      ]);
-    if (!validateCategory || !validateTax || !validateAtrributeValue) {
-      const missing = !validateCategory ? "Category" : !validateTax  ? "Tax" : "Attribute Value";
+    let mainImageUrl = '';
+    let otherImageUrls = [];
+
+    if (req.files) {
+      if (req.files.mainImage && req.files.mainImage[0]) {
+        mainImageUrl = req.files.mainImage[0].path; // Cloudinary URL
+      }
+
+      if (req.files.otherImages && req.files.otherImages.length > 0) {
+        otherImageUrls = req.files.otherImages.map(file => file.path);
+      }
+    }
+
+    // ✅ Parse JSON fields that were stringified
+    const parsedBody = {
+      ...body,
+      simpleProduct: body.simpleProduct ? JSON.parse(body.simpleProduct) : {},
+      dimensions: body.dimensions ? JSON.parse(body.dimensions) : {},
+      video: body.video ? JSON.parse(body.video) : {},
+      productLevelStock: body.productLevelStock ? JSON.parse(body.productLevelStock) : {},
+      variants: body.variants ? JSON.parse(body.variants) : [],
+      tags: body.tags ? JSON.parse(body.tags) : [],
+      attributeValues: body.attributeValues ? JSON.parse(body.attributeValues) : [],
+      deliverableZipcodes: body.deliverableZipcodes ? JSON.parse(body.deliverableZipcodes) : [],
+    };
+    const [validateCategory, validateTax] = await Promise.all([
+      checkStatus(Category, body.categoryId),
+      checkStatus(Tax, body.taxId)
+    ]);
+    if (body.productType === PRODUCT_TYPES.VARIABLE) {
+      const validateAtrributeValue = await checkStatus(AttributeValue, parsedBody.attributeValues);
+      if (!validateAtrributeValue) {
+        return res.status(400).json({
+          success: false,
+          message: "Attribute Value is inactive or invalid.",
+        });
+      }
+    }
+    if (!validateCategory || !validateTax) {
+      const missing = !validateCategory ? "Category" : !validateTax ? "Tax" : "Attribute Value";
 
       return res.status(400).json({
         success: false,
@@ -63,25 +98,46 @@ const addProduct = async (req, res) => {
       });
     }
 
+    // const productData = {
+    //   vendorId,
+    //   ...mapBasicInfo(body, validateCategory),
+    //   ...mapCategorization(body, validateCategory, toArray),
+    //   ...mapTaxPricing(body, toBool),
+    //   ...mapInventory(body, toInt),
+    //   ...mapProductType(body),
+    //   ...mapShipping(body, toInt, toArray),
+    //   ...mapDimensions(body, toFloat),
+    //   ...mapPolicies(body),
+    //   ...mapDigitalProduct(body, toBool),
+    //   mainImage: mainImageUrl,
+    //   otherImages: otherImageUrls,
+
+    //   // // Video handling
+    //   video: body.video ? JSON.parse(body.video) : {},
+    //   status: body.status === undefined ? true : toBool(body.status),
+    // };
+
     const productData = {
       vendorId,
-      ...mapBasicInfo(body, validateCategory),
-      ...mapCategorization(body, validateCategory, toArray),
-      ...mapTaxPricing(body, toBool),
-      ...mapInventory(body, toInt),
-      ...mapProductType(body),
-      ...mapShipping(body, toInt, toArray),
-      ...mapDimensions(body, toFloat),
-      ...mapPolicies(body),
-      ...mapMedia(body),
-      ...mapDigitalProduct(body, toBool),
-      // ...mapSEO(body),
-      status: body.status === undefined ? true : toBool(body.status),
+      ...mapBasicInfo(parsedBody),
+      ...mapCategorization(parsedBody, validateCategory),
+      ...mapTaxPricing(parsedBody, toBool),
+      ...mapInventory(parsedBody, toInt),
+      ...mapProductType(parsedBody),
+      ...mapShipping(parsedBody),
+      ...mapDimensions(parsedBody,toFloat),
+      ...mapPolicies(parsedBody),
+      ...mapDigitalProduct(parsedBody),
+      mainImage: mainImageUrl,
+      otherImages: otherImageUrls,
+      video: parsedBody.video,
+      status: parsedBody.status === undefined ? true : parsedBody.status,
     };
 
-    addProductTypeData(productData, body, toInt, toFloat, toArray);
+    addProductTypeData(productData, parsedBody,toInt, toFloat,toArray);
 
     const product = new Product(productData);
+    console.log("New Product Data:", product);
     await product.save();
 
     res.status(201).json({
@@ -245,20 +301,20 @@ const deleteProduct = async (req, res) => {
 // GET SINGLE PRODUCT
 // ==========================================
 
-const getProduct = async (req, res) => {
+const getProductById = async (req, res) => {
   try {
     const { productId } = req.params;
 
-    const product = await Product.findOne({
+    const productDoc = await Product.findOne({
       _id: productId,
       isDeleted: false,
     })
       .populate("vendorId", "username company")
       .populate("categoryId", "name sub_category")
       .populate("taxId", "title percentage")
-      .populate("attributeValues" ,"value swatche_type swatche_value");
+      .populate("attributeValues", "value swatche_type swatche_value")
 
-    if (!product) {
+    if (!productDoc) {
       return res.status(404).json({
         success: false,
         message: "Product not found",
@@ -266,7 +322,10 @@ const getProduct = async (req, res) => {
     }
 
     // Increment views
-    await product.incrementViews();
+    await productDoc.incrementViews();
+
+    // Convert to plain object with virtuals for response
+    const product = productDoc.toObject();
 
     res.status(200).json({
       success: true,
@@ -357,11 +416,11 @@ const getAllProducts = async (req, res) => {
         {
           $or: [
             { deliverableType: "all" },
-            { deliverableZipcodes: deliverableZipcodes } 
+            { deliverableZipcodes: deliverableZipcodes }
           ]
         }
       ];
-}
+    }
 
     // Stock filter
     if (inStock === "true") {
@@ -387,18 +446,18 @@ const getAllProducts = async (req, res) => {
       .populate("vendorId", "username company")
       .populate("categoryId", "name sub_category")
       .populate("taxId", "title percentage")
-     .populate({
+      .populate({
         path: "attributeValues",
-        select: "value swatche_type swatche_value attribute_id", 
+        select: "value swatche_type swatche_value attribute_id",
         populate: ({
           path: "attribute_id",
-          select: "name type attribute_set_id", 
-          populate:{
-            path :'attribute_set_id',
-            select : "name"
+          select: "name type attribute_set_id",
+          populate: {
+            path: 'attribute_set_id',
+            select: "name"
           }
         })
-    })
+      })
       .sort(sort)
       .skip(skip)
       .limit(parseInt(limit));
@@ -636,9 +695,8 @@ const updateProductStatus = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: `Product ${
-        product.status ? "activated" : "deactivated"
-      } successfully`,
+      message: `Product ${product.status ? "activated" : "deactivated"
+        } successfully`,
       data: { product },
     });
   } catch (error) {
@@ -899,7 +957,7 @@ module.exports = {
   addProduct,
   updateProduct,
   deleteProduct,
-  getProduct,
+  getProductById,
   getAllProducts,
   getVendorProducts,
   getProductsByCategory,

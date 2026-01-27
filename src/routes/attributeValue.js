@@ -5,7 +5,8 @@ const {
     getAllAttributeValues,
     updateAttributeValue,
     deleteAttributeValue,
-    getAttributeValueById
+    getAttributeValueById,
+    getAllAttributeValuesStatusTrue
 } = require('../controllers/attributeValue');
 
 const {
@@ -15,7 +16,7 @@ const {
 } = require("../middleware/authMiddleware");
 const {pagination} = require('../middleware/pagination')
 
-
+router.get("/status-true", authenticate, pagination, getAllAttributeValuesStatusTrue);
 router.route('/')
     .post( authenticate,authorizePermission("can_manage_products"),createAttributeValue)
     .get( authenticate,authorizePermission("can_manage_products"),pagination,getAllAttributeValues);

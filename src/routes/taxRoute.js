@@ -5,7 +5,8 @@ const {
   getAllTaxes,
   getTaxById,
   updateTax,
-  deleteTax
+  deleteTax,
+  getAllTaxesStatusTrue
 } = require('../controllers/taxController');
 const {
   authenticate,
@@ -13,8 +14,11 @@ const {
   optionalAuth,
   checkIfAdmin
 } = require("../middleware/authMiddleware");
-
+const { pagination } = require("../middleware/pagination");
 // Standard RESTful endpoints
+
+router.get("/status-true", authenticate, pagination, getAllTaxesStatusTrue);
+
 router.route('/')
   .post(authenticate,authorizePermission("can_manage_products"),createTax)
   .get(authenticate,authorizePermission("can_manage_products"),getAllTaxes);

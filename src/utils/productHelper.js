@@ -89,13 +89,16 @@ function mapPolicies(body) {
 
 function mapMedia(body) {
   return {
-    mainImage: body.mainImage,
-    otherImages: body.otherImages || [],
-    video: {
-      videoType: (body.videoType || body.video.videoType),
-      url: (body.url || body.video.url),
-      file: (body.pro_input_video || body.video.pro_input_video),
-    },
+     mainImage: mainImageUrl || body.mainImage,
+          otherImages: otherImageUrls.length > 0 ? otherImageUrls : 
+                       (body.otherImages ? toArray(body.otherImages) : []),
+    // mainImage: body.mainImage,
+    // otherImages: body.otherImages || [],
+    // video: {
+    //   videoType: (body.videoType || body.video.videoType),
+    //   url: (body.url || body.video.url),
+    //   file: (body.pro_input_video || body.video.pro_input_video),
+    // },
   };
 }
 

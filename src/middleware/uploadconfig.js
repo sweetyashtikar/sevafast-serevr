@@ -77,9 +77,57 @@ const uploadSellerLogo = multer({
     }
 });
 
+const productImageStorage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: {
+        folder: 'product_images',
+        allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+        transformation: [{ width: 1500, height: 1500, crop: 'limit', quality: 'auto' }]
+    }
+});
+
+// Cloudinary storage for product videos
+const productVideoStorage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: {
+        folder: 'product_videos',
+        allowed_formats: ['mp4', 'mov', 'avi'],
+        resource_type: 'video'
+    }
+});
+
+// Create multer instance for products
+const uploadProductImages = multer({
+    storage: productImageStorage,
+    fileFilter: (req, file, cb) => {
+        if (!file.mimetype.startsWith('image/')) {
+            return cb(new Error('Only image files are allowed'), false);
+        }
+         cb(null, true);
+    },
+    limits: {
+        fileSize: MAX_FILE_SIZE,
+        files: 11 // 1 main + 10 other images
+    }
+});
+const uploadProductVideos = multer({
+    storage: productVideoStorage,
+    fileFilter: (req, file, cb) => {
+        if (!file.mimetype.startsWith('video/')) {
+            return cb(new Error('Only video files are allowed'), false);
+        }
+        fileFilter(req, file, cb);
+    },
+    limits: {
+        fileSize: 50 * 1024 * 1024 // 50MB for videos
+    }
+});
+
 module.exports = {
     uploadSellerDocuments,
     uploadSellerLogo,
+    uploadProductVideos,
+    uploadProductImages,
     ALLOWED_FILE_TYPES,
     MAX_FILE_SIZE
 };

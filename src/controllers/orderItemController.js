@@ -96,15 +96,15 @@ const createOrderItem = async (req, res) => {
                 }
                 
                 // Check stock availability
-                if (product.productType === 'simple') {
+                if (product.productType === PRODUCT_TYPES.SIMPLE) {
                     // For simple products, check simple product stock
-                    if (product.simpleProduct.sp_stockStatus !== 'in-stock' || 
+                    if (product.simpleProduct.sp_stockStatus !== STOCK_STATUS.IN_STOCK || 
                         product.simpleProduct.sp_totalStock < variantInfo.quantity) {
                         throw new Error(`Insufficient stock for product ${product.name}`);
                     }
-                } else if (product.productType === 'variable') {
+                } else if (product.productType === PRODUCT_TYPES.VARIABLE) {
                     // For variable products, check variant stock
-                    if (variant.variant_stockStatus !== 'in-stock' || 
+                    if (variant.variant_stockStatus !== STOCK_STATUS.IN_STOCK || 
                         variant.variant_totalStock < variantInfo.quantity) {
                         throw new Error(`Insufficient stock for variant ${product.name}`);
                     }

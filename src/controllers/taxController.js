@@ -55,6 +55,33 @@ const getAllTaxes = async (req, res) => {
   }
 };
 
+// READ: Get all taxes with status true
+const getAllTaxesStatusTrue = async (req, res) => {
+    const { limit, offset, sort, searchQuery, filters } = req.paginationQuery;
+    const finalQuery = { status : true,...searchQuery, ...filters };
+
+  try {
+    const taxes = await Tax.find(finalQuery)
+    .sort(sort)
+    .skip(offset)
+    .limit(limit);
+
+     const total = await Tax.countDocuments(finalQuery);
+    
+
+    res.status(200).json({
+      success: true,
+      total,
+      limit,
+      offset,
+      count: taxes.length,
+      data: taxes
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // READ: Get single tax by ID
 const getTaxById = async (req, res) => {
     const id = req.params.id
@@ -117,5 +144,6 @@ deleteTax,
 updateTax,
 getTaxById,
 getAllTaxes,
-createTax
+createTax,
+getAllTaxesStatusTrue
 }

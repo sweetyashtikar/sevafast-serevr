@@ -74,6 +74,33 @@ const getAllAttributeValues = async (req, res) => {
   }
 };
 
+//get all attribute value where status is true
+const getAllAttributeValuesStatusTrue = async (req, res) => {
+     const { limit, offset, sort, searchQuery, filters } = req.paginationQuery;
+    const finalQuery = { status : true , ...searchQuery, ...filters };
+
+  try {
+    const values = await AttributeValue.find(finalQuery)
+      .populate("attribute_id", "name type status")
+      .sort(sort)
+      .skip(offset)
+      .limit(limit); 
+
+      const total = await AttributeValue.countDocuments(finalQuery);
+
+    res.status(200).json({
+      success: true,
+      total,
+      limit,
+      offset,
+      count: values.length,
+      data: values,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // GET ALL (With optional filtering by Set) recheck the code
 const getAttributeByAttributeID = async (req, res) => {
   try {
@@ -186,5 +213,6 @@ module.exports = {
   getAllAttributeValues,
   updateAttributeValue,
   deleteAttributeValue,
-  getAttributeValueById
+  getAttributeValueById,
+  getAllAttributeValuesStatusTrue
 };
