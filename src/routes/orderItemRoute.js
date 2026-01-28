@@ -27,13 +27,13 @@ const {authenticate} = require('../middleware/authMiddleware');
 router.post('/',authenticate,createOrderItem )
 
 //bulk create order ITems
-router.post('/bulk',bulkCreateOrderItems)
+// router.post('/bulk',bulkCreateOrderItems)
 
 //get all order item
 router.get('/', getAllOrderItems)
 
 //get order Item by Id
-router.get('/:id', getOrderItemById)
+router.get('/:order_id', authenticate,getOrderItemById)
 
 // 5. READ - Get order items by order ID
 router.get('/:order_id', getOrderItemsByOrder)
@@ -48,13 +48,13 @@ router.put('/:id', updateOrderItem)
 router.put('/:id', markCommissionAsCredited)
 
 // 9. DELETE - Cancel/remove order item
-router.delete('/:id', cancelOrderItem)
+router.patch('/order-item/:id/cancel',authenticate, cancelOrderItem);
 
 // 10. ANALYTICS - Get seller performance
 router.get('/:seller_id', getSellerPerformance)
 
 //11. get all the order of the user
-router.get('/:seller_id', getUserOrders)
+router.get('/getUserOrders/:user_id', authenticate, getUserOrders)
 
 //12. update order status
 router.put('/:order_id', updateOrderStatus)

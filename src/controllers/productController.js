@@ -159,81 +159,216 @@ const addProduct = async (req, res) => {
 // UPDATE PRODUCT
 // ==========================================
 
+// const updateProduct = async (req, res) => {
+//   try {
+//     const { productId } = req.params;
+//     const vendorId = req.user._id;
+//     const body = req.body;
+
+//     // Find product
+//     const product = await Product.findOne({
+//       _id: productId,
+//       vendorId,
+//       isDeleted: false,
+//     });
+
+//     if (!product) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Product not found",
+//       });
+//     }
+
+//     console.log("Update Product Request Body:", body);
+
+//     // Validate and update category if provided
+//     if (isDefined(body.categoryId)) {
+//       const categoryId = await checkStatus(Category, body.categoryId);
+//       if (!categoryId) {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Category is inactive or invalid",
+//         });
+//       }
+//       product.categoryId = categoryId;
+//     }
+
+//     // Update basic information
+//     updateBasicInfo(product, body);
+
+//     // Update categorization
+//     updateCategorization(product, body, toArray, toInt);
+
+//     // Update tax & pricing
+//     updateTaxPricing(product, body, toBool);
+
+//     // Update inventory
+//     updateInventory(product, body, toInt);
+
+//     // Update shipping
+//     updateShipping(product, body, toInt, toArray);
+
+//     // Update dimensions
+//     updateDimensions(product, body, toFloat);
+
+//     // Update policies
+//     updatePolicies(product, body, toBool);
+
+//     // Update media
+//     updateMedia(product, body);
+
+//     // Update digital product settings
+//     updateDigitalProduct(product, body, toBool);
+
+//     // Update status
+//     if (isDefined(body.status)) {
+//       product.status = toBool(body.status);
+//     }
+
+//     // Update product type specific data
+//     updateProductTypeData(product, body, toInt, toFloat, toArray, isDefined);
+
+//     await product.save();
+
+//     res.status(200).json({
+//       success: true,
+//       message: "Product updated successfully",
+//       data: { product },
+//     });
+//   } catch (error) {
+//     console.error("Update product error:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Failed to update product",
+//       error: error.message,
+//     });
+//   }
+// };
+
 const updateProduct = async (req, res) => {
   try {
-    const { productId } = req.params;
-    const vendorId = req.user._id;
+    const { id } = req.params;
     const body = req.body;
+    console.log("Update Product Request Body:", body);
+    console.log("Uploaded Files:", req.files);
 
-    // Find product
-    const product = await Product.findOne({
-      _id: productId,
-      vendorId,
-      isDeleted: false,
-    });
-
-    if (!product) {
+    // Find existing product
+    const existingProduct = await Product.findById(id);
+    if (!existingProduct) {
       return res.status(404).json({
         success: false,
         message: "Product not found",
       });
     }
 
-    console.log("Update Product Request Body:", body);
+    // Handle image uploads
+    let mainImageUrl = existingProduct.mainImage;
+    let otherImageUrls = [...(existingProduct.otherImages || [])];
 
-    // Validate and update category if provided
-    if (isDefined(body.categoryId)) {
-      const categoryId = await checkStatus(Category, body.categoryId);
-      if (!categoryId) {
+    if (req.files) {
+      // Update main image if new one uploaded
+      if (req.files.mainImage && req.files.mainImage[0]) {
+        mainImageUrl = req.files.mainImage[0].path;
+      }
+
+      // Update other images if new ones uploaded
+      if (req.files.otherImages && req.files.otherImages.length > 0) {
+        const newImages = req.files.otherImages.map(file => file.path);
+        
+        // Handle existing images
+        if (body.existingOtherImages) {
+          const existingImages = JSON.parse(body.existingOtherImages);
+          otherImageUrls = [...existingImages.map(img => img.url), ...newImages];
+        } else {
+          otherImageUrls = newImages;
+        }
+      }else if (body.existingOtherImages) {
+        // No new images, but keep existing ones
+        const existingImages = JSON.parse(body.existingOtherImages);
+        otherImageUrls = existingImages.map(img => img.url);
+      }
+    } else if (body.existingOtherImages) {
+      // No files uploaded, but keep existing images
+      const existingImages = JSON.parse(body.existingOtherImages);
+      otherImageUrls = existingImages.map(img => img.url);
+    }
+    
+
+  // Parse JSON fields
+    const parsedBody = {
+      ...body,
+      simpleProduct: body.simpleProduct ? JSON.parse(body.simpleProduct) : existingProduct.simpleProduct,
+      dimensions: body.dimensions ? JSON.parse(body.dimensions) : existingProduct.dimensions,
+      video: body.video ? JSON.parse(body.video) : existingProduct.video,
+      productLevelStock: body.productLevelStock ? JSON.parse(body.productLevelStock) : existingProduct.productLevelStock,
+      variants: body.variants ? JSON.parse(body.variants) : existingProduct.variants,
+      tags: body.tags ? JSON.parse(body.tags) : existingProduct.tags,
+      attributeValues: body.attributeValues ? JSON.parse(body.attributeValues) : existingProduct.attributeValues,
+      deliverableZipcodes: body.deliverableZipcodes ? JSON.parse(body.deliverableZipcodes) : existingProduct.deliverableZipcodes,
+    };
+
+    // Validate references if they're being updated
+    if (parsedBody.categoryId && parsedBody.categoryId !== existingProduct.categoryId.toString()) {
+      const validateCategory = await checkStatus(Category, parsedBody.categoryId);
+      if (!validateCategory) {
         return res.status(400).json({
           success: false,
-          message: "Category is inactive or invalid",
+          message: "Category is inactive or invalid.",
         });
       }
-      product.categoryId = categoryId;
     }
 
-    // Update basic information
-    updateBasicInfo(product, body);
-
-    // Update categorization
-    updateCategorization(product, body, toArray, toInt);
-
-    // Update tax & pricing
-    updateTaxPricing(product, body, toBool);
-
-    // Update inventory
-    updateInventory(product, body, toInt);
-
-    // Update shipping
-    updateShipping(product, body, toInt, toArray);
-
-    // Update dimensions
-    updateDimensions(product, body, toFloat);
-
-    // Update policies
-    updatePolicies(product, body, toBool);
-
-    // Update media
-    updateMedia(product, body);
-
-    // Update digital product settings
-    updateDigitalProduct(product, body, toBool);
-
-    // Update status
-    if (isDefined(body.status)) {
-      product.status = toBool(body.status);
+    if (parsedBody.taxId && parsedBody.taxId !== existingProduct.taxId?.toString()) {
+      const validateTax = await checkStatus(Tax, parsedBody.taxId);
+      if (!validateTax) {
+        return res.status(400).json({
+          success: false,
+          message: "Tax is inactive or invalid.",
+        });
+      }
     }
 
-    // Update product type specific data
-    updateProductTypeData(product, body, toInt, toFloat, toArray, isDefined);
+    // ✅ FIX: Validate simpleProduct BEFORE updating
+    if (parsedBody.simpleProduct && parsedBody.productType === 'simple_product') {
+      const { sp_price, sp_specialPrice } = parsedBody.simpleProduct;
+      if (sp_specialPrice && sp_price && sp_specialPrice >= sp_price) {
+        return res.status(400).json({
+          success: false,
+          message: "Special price must be less than regular price",
+        });
+      }
+    }
 
-    await product.save();
+    // Build update data
+    const updateData = {
+      ...mapBasicInfo(parsedBody),
+      ...mapCategorization(parsedBody, parsedBody.categoryId || existingProduct.categoryId),
+      ...mapTaxPricing(parsedBody,toBool),
+      ...mapInventory(parsedBody,toInt),
+      ...mapProductType(parsedBody),
+      ...mapShipping(parsedBody),
+      ...mapDimensions(parsedBody,toFloat),
+      ...mapPolicies(parsedBody),
+      ...mapDigitalProduct(parsedBody),
+      mainImage: mainImageUrl,
+      otherImages: otherImageUrls,
+      video: parsedBody.video,
+      status: parsedBody.status !== undefined ? parsedBody.status : existingProduct.status,
+    };
+
+    addProductTypeData(updateData, parsedBody, toFloat, toBool, toInt, toArray);
+
+    // Update product
+    const updatedProduct = await Product.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true, runValidators: false }
+    ).populate('categoryId taxId vendorId attributeValues');
 
     res.status(200).json({
       success: true,
       message: "Product updated successfully",
-      data: { product },
+      data: updatedProduct,
     });
   } catch (error) {
     console.error("Update product error:", error);
@@ -265,15 +400,6 @@ const deleteProduct = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "Product not found",
-      });
-    }
-
-    const categoryId = await checkStatus(Category, body.categoryId);
-    console.log("categoryId", categoryId);
-    if (!categoryId) {
-      return res.status(400).json({
-        success: false,
-        message: "Category is inactive or invalid",
       });
     }
 
@@ -341,11 +467,58 @@ const getProductById = async (req, res) => {
   }
 };
 
+//get all products irrespective of status and isApproved
+const getAllProducts = async (req, res) => {
+  try {
+
+    console.log("req product", req.query)
+
+    // Execute query
+    const products = await Product.find({})
+      .populate("vendorId", "username company")
+      .populate("categoryId", "name sub_category")
+      .populate("taxId", "title percentage")
+      .populate({
+        path: "attributeValues",
+        select: "value swatche_type swatche_value attribute_id",
+        populate: ({
+          path: "attribute_id",
+          select: "name type attribute_set_id",
+          populate: {
+            path: 'attribute_set_id',
+            select: "name"
+          }
+        })
+      })
+
+    // console.log("products", products)
+    console.log("products.length", products.length)
+
+    // Get total count
+
+
+    res.status(200).json({
+      success: true,
+      data: {
+        products,
+      },
+    });
+  } catch (error) {
+    console.error("Get all products error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch products",
+      error: error.message,
+    });
+  }
+};
+
+
 // ==========================================
 // GET ALL PRODUCTS (with filters)
 // ==========================================
 
-const getAllProducts = async (req, res) => {
+const getAllProductsWithFilters = async (req, res) => {
   try {
     const {
       page = 1,
@@ -958,7 +1131,7 @@ module.exports = {
   updateProduct,
   deleteProduct,
   getProductById,
-  getAllProducts,
+  getAllProductsWithFilters,
   getVendorProducts,
   getProductsByCategory,
   searchProducts,
@@ -968,4 +1141,5 @@ module.exports = {
   getFeaturedProducts,
   getRelatedProducts,
   approveProduct,
+  getAllProducts
 };

@@ -596,11 +596,11 @@ const getAllOrderItems = async (req, res) => {
 const getOrderItemById = async (req, res) => {
    try {
       const { order_id } = req.params;
-      const user_id = req.user.id;
+      console.log(" order_id ", order_id);
+      const user_id = req.user._id;
       
       const order = await Order.findOne({ 
         _id: order_id,
-        user_id 
       }).lean();
       
       if (!order) {
@@ -620,6 +620,7 @@ const getOrderItemById = async (req, res) => {
       });
       
     } catch (error) {
+        console.log(error)
       res.status(500).json({
         success: false,
         message: 'Failed to fetch order details',
@@ -782,6 +783,7 @@ const updateOrderItemStatus = async (req, res) => {
 
         // Get order item
         const orderItem = await OrderItem.findById(id).session(session);
+        console.log(" orderItem ", orderItem);
         if (!orderItem) {
             await session.abortTransaction();
             session.endSession();
@@ -843,12 +845,12 @@ const updateOrderItemStatus = async (req, res) => {
             .lean();
 
         // Send notifications
-        await sendOrderItemStatusNotification(
-            orderItem.user_id,
-            orderItem.seller_id,
-            orderItem.order_id,
-            active_status
-        );
+        // await sendOrderItemStatusNotification(
+        //     orderItem.user_id,
+        //     orderItem.seller_id,
+        //     orderItem.order_id,
+        //     active_status
+        // );
 
         res.status(200).json({
             success: true,
@@ -1074,10 +1076,12 @@ const markCommissionAsCredited = async (req, res) => {
 const cancelOrderItem = async (req, res) => {
     const session = await mongoose.startSession();
     session.startTransaction();
-    
+    const user_id = req.user._id
     try {
         const { id } = req.params;
-        const { reason, initiated_by } = req.body;
+        const { reason, initiated_by, 
+            refund_amount,
+            refund_to_wallet = true } = req.body;
 
         // Validate ID
         if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -1086,6 +1090,27 @@ const cancelOrderItem = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: 'Invalid Order Item ID format'
+            });
+        }
+
+        // Validate required fields
+        if (!reason || !initiated_by ) {
+            await session.abortTransaction();
+            session.endSession();
+            return res.status(400).json({
+                success: false,
+                message: 'Missing required fields: reason, initiated_by, user_id'
+            });
+        }
+
+         // Validate initiated_by
+        const validInitiators = ['customer', 'seller', 'admin', 'system'];
+        if (!validInitiators.includes(initiated_by)) {
+            await session.abortTransaction();
+            session.endSession();
+            return res.status(400).json({
+                success: false,
+                message: `Invalid initiated_by. Must be one of: ${validInitiators.join(', ')}`
             });
         }
 
@@ -1100,41 +1125,132 @@ const cancelOrderItem = async (req, res) => {
             });
         }
 
+        // Check if user has permission to cancel
+        if (initiated_by === 'customer' && orderItem.user_id.toString() !== user_id) {
+            await session.abortTransaction();
+            session.endSession();
+            return res.status(403).json({
+                success: false,
+                message: 'You do not have permission to cancel this order item'
+            });
+        }
+
         // Check if can be cancelled
         if (!canCancelOrderItem(orderItem)) {
             await session.abortTransaction();
             session.endSession();
             return res.status(400).json({
                 success: false,
-                message: `Cannot cancel item in ${orderItem.active_status} status`
+                message: `Cannot cancel item in ${orderItem.active_status} status. Allowed statuses: awaiting, received`
             });
         }
-
+        
+        // Calculate refund amount (if not provided)
+        const calculatedRefundAmount = refund_amount || calculateRefundAmount(orderItem);
         // Update status to cancelled
         orderItem.active_status = 'cancelled';
         orderItem.status_history.push({
             status: 'cancelled',
             timestamp: new Date(),
-            notes: `Cancelled by ${initiated_by}: ${reason}`
+            notes: `Cancelled by ${initiated_by}: ${reason}`,
+             refund_amount: calculatedRefundAmount
         });
 
         await orderItem.save({ session });
 
+        // Get the parent order
+        const order = await Order.findById(orderItem.order_id).session(session);
+        if (!order) {
+            await session.abortTransaction();
+            session.endSession();
+            return res.status(404).json({
+                success: false,
+                message: 'Parent order not found'
+            });
+        }
+
+        // Update order cancellation details
+        order.cancellation = {
+            reason,
+            initiated_by,
+            user_id: mongoose.Types.ObjectId.isValid(user_id) ? user_id : null,
+            refund_status: 'pending',
+            refund_amount: calculatedRefundAmount,
+            cancelled_at: new Date()
+        };
+
+        // Process refund if applicable
+        let refundProcessed = false;
+        if (calculatedRefundAmount > 0) {
+            refundProcessed = await processRefund(
+                order, 
+                orderItem, 
+                calculatedRefundAmount, 
+                refund_to_wallet, 
+                session
+            );
+            
+            if (refundProcessed) {
+                order.cancellation.refund_status = 'processed';
+                order.cancellation.refund_processed_at = new Date();
+                order.cancellation.refund_method = refund_to_wallet ? 'wallet' : 'original_payment';
+            }
+        }
+
+        await order.save({ session });
+
         // Update order totals
         await updateOrderTotals(orderItem.order_id, session);
+
+        // Update parent order status based on all items
+        await updateParentOrderStatusEnhanced(orderItem.order_id, session);
 
         await session.commitTransaction();
         session.endSession();
 
+        // Get updated order with populated data
+        const updatedOrder = await Order.findById(order._id)
+            .populate('user_id', 'name email')
+            .lean();
+
+            // Send notifications
+        // await sendCancellationNotification(
+        //     orderItem.user_id,
+        //     orderItem.seller_id,
+        //     order,
+        //     orderItem,
+        //     reason,
+        //     initiated_by,
+        //     calculatedRefundAmount,
+        //     refundProcessed
+        // );
+
         res.status(200).json({
             success: true,
             message: 'Order item cancelled successfully',
-            data: {
-                order_item_id: orderItem._id,
-                product_name: orderItem.product_name,
-                status: orderItem.active_status,
-                refund_amount: orderItem.sub_total,
-                cancelled_at: new Date()
+           data: {
+                order_item: {
+                    _id: orderItem._id,
+                    product_name: orderItem.product_name,
+                    variant_name: orderItem.variant_name,
+                    quantity: orderItem.quantity,
+                    price: orderItem.price,
+                    status: orderItem.active_status,
+                    cancelled_at: new Date()
+                },
+                refund: {
+                    amount: calculatedRefundAmount,
+                    status: refundProcessed ? 'processed' : 'pending',
+                    method: refund_to_wallet ? 'wallet' : 'original_payment',
+                    processed_at: refundProcessed ? new Date() : null
+                },
+                order: {
+                    _id: updatedOrder._id,
+                    order_number: updatedOrder.order_number,
+                    status: updatedOrder.status,
+                    updated_total: updatedOrder.total_payable,
+                    cancellation: updatedOrder.cancellation
+                }
             }
         });
 
@@ -1145,7 +1261,8 @@ const cancelOrderItem = async (req, res) => {
         console.error('Error cancelling order item:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to cancel order item'
+            message: 'Failed to cancel order item',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }
 };
@@ -1311,7 +1428,7 @@ const getSellerPerformance = async (req, res) => {
 //11. GET ALL THE ORDER OF THE USER
 const getUserOrders = async (req, res) => {
     try {
-      const user_id = req.user.id;
+      const user_id = req.user._id;
       const { page = 1, limit = 10, status } = req.query;
       
       const query = { user_id };
@@ -1332,6 +1449,7 @@ const getUserOrders = async (req, res) => {
           return { ...order, items };
         })
       );
+      console.log(" ordersWithItems ", ordersWithItems);
       
       res.json({
         success: true,
@@ -1344,6 +1462,7 @@ const getUserOrders = async (req, res) => {
       });
       
     } catch (error) {
+        console.log(error)
       res.status(500).json({
         success: false,
         message: 'Failed to fetch orders',
@@ -1704,6 +1823,637 @@ const getOrderAnalytics = async (req, res) => {
     }
 }
 
+// Helper function to update parent order status based on order items
+const updateParentOrderStatus = async (orderId, session) => {
+    try {
+        console.log(`Updating parent order status for order: ${orderId}`);
+        
+        // Get all order items for this order
+        const orderItems = await OrderItem.find({ order_id: orderId }).session(session);
+        
+        if (!orderItems || orderItems.length === 0) {
+            console.log('No order items found for this order');
+            return;
+        }
+
+        // Get unique statuses of all order items
+        const allStatuses = orderItems.map(item => item.active_status);
+        const uniqueStatuses = [...new Set(allStatuses)];
+        
+        console.log(`Order items statuses: ${allStatuses.join(', ')}`);
+        console.log(`Unique statuses: ${uniqueStatuses.join(', ')}`);
+
+        // Determine parent order status based on all items
+        let parentStatus;
+        const itemsCount = orderItems.length;
+
+        // Check for specific status scenarios based on your OrderStatus enum
+        if (uniqueStatuses.includes('cancelled') && uniqueStatuses.length === 1) {
+            // All items are cancelled
+            parentStatus = 'cancelled';
+        } 
+        else if (uniqueStatuses.includes('returned') && uniqueStatuses.length === 1) {
+            // All items are returned
+            parentStatus = 'returned';
+        }
+        else if (uniqueStatuses.includes('delivered') && uniqueStatuses.every(status => 
+            status === 'delivered' || status === 'returned' || status === 'cancelled')) {
+            // All items are either delivered, returned, or cancelled
+            const deliveredCount = allStatuses.filter(status => status === 'delivered').length;
+            const returnedCount = allStatuses.filter(status => status === 'returned').length;
+            const cancelledCount = allStatuses.filter(status => status === 'cancelled').length;
+            
+            if (deliveredCount === itemsCount) {
+                parentStatus = 'delivered';
+            } else if (deliveredCount > 0) {
+                parentStatus = 'shipped'; // Partially delivered = still shipped
+            }
+        }
+        else if (uniqueStatuses.includes('shipped')) {
+            // At least one item is shipped
+            parentStatus = 'shipped';
+        }
+        else if (uniqueStatuses.includes('processed')) {
+            // At least one item is processed
+            parentStatus = 'processed';
+        }
+        else if (uniqueStatuses.includes('received')) {
+            // Items are received by sellers
+            parentStatus = 'received';
+        }
+        else if (uniqueStatuses.includes('awaiting')) {
+            // Items are still awaiting processing
+            parentStatus = 'received'; // Default status for new orders
+        }
+        else {
+            // Default to the most advanced status using your hierarchy
+            parentStatus = determineMostAdvancedStatusForOrder(uniqueStatuses);
+        }
+
+        console.log(`Determined parent order status: ${parentStatus}`);
+
+        // Update the parent order
+        const order = await Order.findById(orderId).session(session);
+        
+        if (order) {
+            const previousStatus = order.status;
+            
+            if (previousStatus !== parentStatus) {
+                // Update status and timestamp
+                order.status = parentStatus;
+                
+                // Update status timestamps if they exist
+                if (order.status_timestamps) {
+                    order.status_timestamps[parentStatus] = new Date();
+                }
+                
+                // Auto-set delivered_at when status changes to delivered
+                if (parentStatus === 'delivered') {
+                    order.delivery_info.delivered_at = new Date();
+                    order.payment.status = 'paid';
+                }
+                
+                // Auto-set paid_at for delivered orders
+                if (parentStatus === 'delivered' && !order.payment.paid_at) {
+                    order.payment.paid_at = new Date();
+                }
+                
+                await order.save({ session });
+                
+                console.log(`Parent order ${orderId} status updated from ${previousStatus} to ${parentStatus}`);
+                
+                // Send notification for order status change
+                // await sendOrderStatusNotification(order.user_id, parentStatus, order);
+            } else {
+                console.log(`Parent order status unchanged: ${parentStatus}`);
+            }
+        } else {
+            console.log(`Parent order not found: ${orderId}`);
+        }
+
+    } catch (error) {
+        console.error('Error updating parent order status:', error);
+        throw error; // Re-throw to be caught by parent transaction
+    }
+};
+
+// Helper function to determine the most advanced status for ORDER (not item)
+const determineMostAdvancedStatusForOrder = (statuses) => {
+    // Your Order status hierarchy (from least to most advanced)
+    const orderStatusHierarchy = [
+        'cancelled',
+        'returned',
+        'received',
+        'processed',
+        'shipped',
+        'delivered'
+    ];
+
+    // Find the highest status in hierarchy
+    let highestStatus = 'received'; // Default
+    let highestIndex = -1;
+
+    statuses.forEach(status => {
+        // Map item status to order status if needed
+        const mappedStatus = mapItemStatusToOrderStatus(status);
+        const index = orderStatusHierarchy.indexOf(mappedStatus);
+        if (index > highestIndex) {
+            highestIndex = index;
+            highestStatus = mappedStatus;
+        }
+    });
+
+    return highestStatus;
+};
+
+// Helper to map OrderItem status to Order status
+const mapItemStatusToOrderStatus = (itemStatus) => {
+    const mapping = {
+        'awaiting': 'received',
+        'received': 'received',
+        'processed': 'processed',
+        'shipped': 'shipped',
+        'delivered': 'delivered',
+        'cancelled': 'cancelled',
+        'returned': 'returned'
+    };
+    
+    return mapping[itemStatus] || 'received';
+};
+
+// Modified version for your OrderStatus enum
+// const isValidItemStatusTransition = (currentStatus, newStatus) => {
+//     const validTransitions = {
+//         'awaiting': ['received', 'cancelled'],
+//         'received': ['processed', 'cancelled'],
+//         'processed': ['shipped', 'cancelled'],
+//         'shipped': ['delivered', 'cancelled'],
+//         'delivered': ['returned'],
+//         'cancelled': [], // Once cancelled, cannot change
+//         'returned': []   // Once returned, cannot change
+//     };
+
+//     return validTransitions[currentStatus]?.includes(newStatus) || false;
+// };
+
+// Enhanced version with better status calculation logic
+const updateParentOrderStatusEnhanced = async (orderId, session) => {
+    try {
+        const orderItems = await OrderItem.find({ order_id: orderId }).session(session);
+        
+        if (!orderItems.length) return;
+
+        const order = await Order.findById(orderId).session(session);
+        if (!order) return;
+
+        const statusCounts = {};
+        orderItems.forEach(item => {
+            statusCounts[item.active_status] = (statusCounts[item.active_status] || 0) + 1;
+        });
+
+        const totalItems = orderItems.length;
+        console.log('Status counts:', statusCounts, 'Total items:', totalItems);
+
+        // Your business logic for order status
+        let newOrderStatus = order.status; // Default to current
+        
+        // If all items are cancelled
+        if (statusCounts['cancelled'] === totalItems) {
+            newOrderStatus = 'cancelled';
+        }
+        // If all items are returned
+        else if (statusCounts['returned'] === totalItems) {
+            newOrderStatus = 'returned';
+        }
+        // If all items are delivered
+        else if (statusCounts['delivered'] === totalItems) {
+            newOrderStatus = 'delivered';
+            
+            // Auto-update payment status for delivered orders
+            order.payment.status = 'paid';
+            if (!order.payment.paid_at) {
+                order.payment.paid_at = new Date();
+            }
+        }
+        // If at least one item is delivered (but not all)
+        else if (statusCounts['delivered'] > 0) {
+            // If all remaining items are either cancelled or returned
+            const remainingItems = totalItems - (statusCounts['delivered'] || 0);
+            const cancelledReturnedCount = (statusCounts['cancelled'] || 0) + (statusCounts['returned'] || 0);
+            
+            if (remainingItems === cancelledReturnedCount) {
+                newOrderStatus = 'delivered';
+            } else {
+                newOrderStatus = 'shipped';
+            }
+        }
+        // If at least one item is shipped
+        else if (statusCounts['shipped'] > 0) {
+            newOrderStatus = 'shipped';
+        }
+        // If at least one item is processed
+        else if (statusCounts['processed'] > 0) {
+            newOrderStatus = 'processed';
+        }
+        // If at least one item is received
+        else if (statusCounts['received'] > 0) {
+            newOrderStatus = 'received';
+        }
+        // If all items are awaiting
+        else if (statusCounts['awaiting'] === totalItems) {
+            newOrderStatus = 'received';
+        }
+
+        // Only update if status changed
+        if (order.status !== newOrderStatus) {
+            const previousStatus = order.status;
+            order.status = newOrderStatus;
+            
+            // Update status timestamp
+            if (order.status_timestamps && typeof order.status_timestamps === 'object') {
+                order.status_timestamps[newOrderStatus] = new Date();
+            }
+            
+            // Special handling for delivered status
+            if (newOrderStatus === 'delivered') {
+                order.delivery_info.delivered_at = new Date();
+            }
+            
+            await order.save({ session });
+            
+            console.log(`Order ${order.order_number} status updated: ${previousStatus} → ${newOrderStatus}`);
+            
+            // Log status summary for debugging
+            console.log('Order Status Summary:', {
+                orderId: order._id,
+                orderNumber: order.order_number,
+                previousStatus,
+                newStatus: newOrderStatus,
+                itemStatusBreakdown: statusCounts,
+                totalItems,
+                timestamp: new Date()
+            });
+            
+            // Send notification
+            // await sendOrderStatusNotification(order.user_id, newOrderStatus, order);
+        }
+
+    } catch (error) {
+        console.error('Error in enhanced parent order update:', error);
+        throw error;
+    }
+};
+
+// Helper function to check if order item can be cancelled
+const canCancelOrderItem = (orderItem) => {
+    const cancelableStatuses = ['awaiting', 'received'];
+    return cancelableStatuses.includes(orderItem.active_status);
+};
+
+// Helper function to calculate refund amount
+const calculateRefundAmount = (orderItem) => {
+    // Calculate based on sub_total (price * quantity)
+    let refundAmount = orderItem.sub_total;
+    
+    // If there were any discounts applied proportionally
+    if (orderItem.discount > 0) {
+        // Apply discount proportionally
+        refundAmount = orderItem.sub_total - orderItem.discount;
+    }
+    
+    // Deduct any commission that might have been charged
+    if (orderItem.admin_commission_amount > 0) {
+        refundAmount -= orderItem.admin_commission_amount;
+    }
+    
+    // Ensure refund amount is not negative
+    return Math.max(0, refundAmount);
+};
+
+const updateOrderTotals = async (orderId, session) => {
+    try {
+        console.log(`Updating totals for order: ${orderId}`);
+        
+        // Get all order items for this order
+        const orderItems = await OrderItem.find({ order_id: orderId }).session(session);
+        
+        if (!orderItems || orderItems.length === 0) {
+            console.log('No order items found for this order');
+            return;
+        }
+
+        // Get the parent order
+        const order = await Order.findById(orderId).session(session);
+        if (!order) {
+            console.log('Order not found');
+            return;
+        }
+
+        // Filter out cancelled items for total calculation
+        const activeOrderItems = orderItems.filter(item => 
+            item.active_status !== 'cancelled' && item.active_status !== 'returned'
+        );
+
+        // Calculate new totals
+        let newTotal = 0;
+        let newDiscount = 0;
+        let newTaxAmount = 0;
+        let newSubTotal = 0;
+
+        activeOrderItems.forEach(item => {
+            newSubTotal += item.sub_total || 0;
+            newDiscount += item.discount || 0;
+            newTaxAmount += item.tax_amount || 0;
+        });
+
+        newTotal = newSubTotal - newDiscount + newTaxAmount;
+
+        // Add delivery charge if applicable
+        let deliveryCharge = order.delivery_charge || 0;
+        
+        // If all items are cancelled, remove delivery charge
+        if (activeOrderItems.length === 0) {
+            deliveryCharge = 0;
+        }
+
+        // Calculate final total with delivery
+        const newFinalTotal = newTotal + deliveryCharge;
+
+        // Update order with new totals
+        order.total = newTotal;
+        order.discount = newDiscount;
+        order.tax_amount = newTaxAmount;
+        order.total_payable = newFinalTotal;
+        order.final_total = newFinalTotal;
+        order.delivery_charge = deliveryCharge;
+        
+        // Update the promo details if all items are cancelled
+        if (activeOrderItems.length === 0 && order.promo_details && order.promo_details.code) {
+            order.promo_details.code = null;
+            order.promo_details.discount = 0;
+        }
+
+        // Log the changes for debugging
+        console.log('Order totals updated:', {
+            orderId: order._id,
+            orderNumber: order.order_number,
+            oldTotal: order.total,
+            newTotal: newTotal,
+            oldDiscount: order.discount,
+            newDiscount: newDiscount,
+            oldTax: order.tax_amount,
+            newTax: newTaxAmount,
+            oldFinalTotal: order.final_total,
+            newFinalTotal: newFinalTotal,
+            activeItems: activeOrderItems.length,
+            totalItems: orderItems.length,
+            deliveryCharge: deliveryCharge
+        });
+
+        await order.save({ session });
+
+        console.log(`Order ${order.order_number} totals updated successfully`);
+
+        // If order total becomes 0 after cancellation, update payment status
+        if (newFinalTotal === 0 && order.payment.status !== 'refunded') {
+            order.payment.status = 'refunded';
+            await order.save({ session });
+            console.log(`Payment status updated to refunded for order ${order.order_number}`);
+        }
+
+    } catch (error) {
+        console.error('Error updating order totals:', error);
+        throw error;
+    }
+};
+
+// Process refund to user
+// const processRefund = async (order, orderItem, refundAmount, refundToWallet, session) => {
+//     try {
+//         if (refundAmount <= 0) {
+//             console.log('No refund amount specified');
+//             return false;
+//         }
+
+//         // Check if order was paid
+//         if (order.payment.status !== 'paid' && order.payment.status !== 'partially_refunded') {
+//             console.log('Order not paid, no refund needed');
+//             return true; // No actual refund needed
+//         }
+
+//         // Process refund based on payment method
+//         if (refundToWallet) {
+//             // Refund to user's wallet
+//             await refundToUserWallet(order.user_id, refundAmount, order, orderItem, session);
+//         } else {
+//             // Refund to original payment method
+//             await refundToOriginalPayment(order, refundAmount, orderItem, session);
+//         }
+
+//         // Update payment status
+//         if (refundAmount >= order.total_payable) {
+//             order.payment.status = 'refunded';
+//         } else {
+//             order.payment.status = 'partially_refunded';
+//         }
+
+//         // Add refund transaction record
+//         await createRefundTransaction(order, orderItem, refundAmount, session);
+
+//         console.log(`Refund processed: ${refundAmount} for order item ${orderItem._id}`);
+//         return true;
+
+//     } catch (error) {
+//         console.error('Error processing refund:', error);
+        
+//         // Mark refund as failed
+//         order.cancellation.refund_status = 'failed';
+//         order.cancellation.refund_error = error.message;
+        
+//         return false;
+//     }
+// };
+
+// Helper function to refund to user's wallet
+const refundToUserWallet = async (userId, amount, order, orderItem, session) => {
+    try {
+        // Find user
+        const user = await User.findById(userId).session(session);
+        if (!user) {
+            throw new Error('User not found');
+        }
+
+        // Create wallet transaction
+        const walletTransaction = await WalletTransaction.create([{
+            user_id: userId,
+            order_id: order._id,
+            order_item_id: orderItem._id,
+            type: 'refund',
+            amount: amount,
+            balance_before: user.wallet_balance || 0,
+            balance_after: (user.wallet_balance || 0) + amount,
+            description: `Refund for cancelled order item: ${orderItem.product_name}`,
+            status: 'completed'
+        }], { session });
+
+        // Update user's wallet balance
+        user.wallet_balance = (user.wallet_balance || 0) + amount;
+        await user.save({ session });
+
+        console.log(`Refunded ${amount} to user ${userId}'s wallet`);
+        return walletTransaction[0];
+
+    } catch (error) {
+        console.error('Error refunding to wallet:', error);
+        throw error;
+    }
+};
+
+// Helper function to refund to original payment method
+const refundToOriginalPayment = async (order, amount, orderItem, session) => {
+    try {
+        // Implement based on your payment gateway
+        switch (order.payment.method) {
+            case 'Razorpay':
+                // Implement Razorpay refund
+                console.log(`Processing Razorpay refund for order ${order.order_number}`);
+                // const razorpayResponse = await razorpay.payments.refund(
+                //     order.payment.transaction_id,
+                //     { amount: amount * 100 } // Convert to paise
+                // );
+                // return razorpayResponse;
+                break;
+                
+            case 'Stripe':
+                // Implement Stripe refund
+                console.log(`Processing Stripe refund for order ${order.order_number}`);
+                // const stripeResponse = await stripe.refunds.create({
+                //     payment_intent: order.payment.transaction_id,
+                //     amount: amount * 100 // Convert to cents
+                // });
+                // return stripeResponse;
+                break;
+                
+            case 'PayPal':
+                // Implement PayPal refund
+                console.log(`Processing PayPal refund for order ${order.order_number}`);
+                break;
+                
+            case 'COD':
+                // For COD, typically refund to wallet or bank transfer
+                console.log(`COD order - refunding to wallet`);
+                await refundToUserWallet(order.user_id, amount, order, orderItem, session);
+                break;
+                
+            default:
+                console.log(`Unsupported payment method: ${order.payment.method}`);
+                throw new Error(`Refund not supported for ${order.payment.method}`);
+        }
+        
+        return { success: true };
+
+    } catch (error) {
+        console.error('Error refunding to original payment:', error);
+        throw error;
+    }
+};
+
+// Create refund transaction record
+const createRefundTransaction = async (order, orderItem, amount, session) => {
+    try {
+        const refundTransaction = await RefundTransaction.create([{
+            order_id: order._id,
+            order_item_id: orderItem._id,
+            user_id: order.user_id,
+            amount: amount,
+            payment_method: order.payment.method,
+            status: 'completed',
+            transaction_id: `REF-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            notes: `Refund for cancelled order item: ${orderItem.product_name}`,
+            refunded_by: order.cancellation?.initiated_by || 'system'
+        }], { session });
+
+        return refundTransaction[0];
+
+    } catch (error) {
+        console.error('Error creating refund transaction:', error);
+        throw error;
+    }
+};
+
+// Send cancellation notification
+const sendCancellationNotification = async (
+    userId, 
+    sellerId, 
+    order, 
+    orderItem, 
+    reason, 
+    initiatedBy,
+    refundAmount,
+    refundProcessed
+) => {
+    try {
+        // Send to customer
+        await sendNotificationToUser(
+            userId,
+            'order_item_cancelled',
+            {
+                order_number: order.order_number,
+                product_name: orderItem.product_name,
+                reason: reason,
+                refund_amount: refundAmount,
+                refund_status: refundProcessed ? 'Processed' : 'Pending',
+                initiated_by: initiatedBy
+            }
+        );
+
+        // Send to seller
+        await sendNotificationToUser(
+            sellerId,
+            'order_item_cancelled_seller',
+            {
+                order_number: order.order_number,
+                product_name: orderItem.product_name,
+                reason: reason,
+                initiated_by: initiatedBy,
+                item_value: orderItem.sub_total
+            }
+        );
+
+        // Send to admin if needed
+        if (initiatedBy !== 'admin') {
+            await sendNotificationToAdmin(
+                'order_item_cancelled_admin',
+                {
+                    order_number: order.order_number,
+                    product_name: orderItem.product_name,
+                    reason: reason,
+                    initiated_by: initiatedBy,
+                    customer_id: userId,
+                    seller_id: sellerId,
+                    refund_amount: refundAmount
+                }
+            );
+        }
+
+        console.log(`Cancellation notifications sent for order item ${orderItem._id}`);
+
+    } catch (error) {
+        console.error('Error sending cancellation notifications:', error);
+        // Don't throw - notification failure shouldn't break the flow
+    }
+};
+
+// Helper notification functions (placeholder implementations)
+const sendNotificationToUser = async (userId, type, data) => {
+    // Implement your notification logic (email, push, SMS)
+    console.log(`Notification to user ${userId}: ${type}`, data);
+};
+
+const sendNotificationToAdmin = async (type, data) => {
+    // Implement admin notification logic
+    console.log(`Admin notification: ${type}`, data);
+};
 
 
 

@@ -16,12 +16,24 @@ const { uploadProductImages, uploadProductVideos } = require("../middleware/uplo
 // ==========================================
 
 /**
+ * @route   GET /api/products/getAllProducts
+ * @desc    Get all products (admin view)
+ * @access  Private (Admin only)
+ */
+router.get(
+  "/getAllProducts",
+  authenticate,
+  checkIfAdmin,
+  productController.getAllProducts
+);
+
+/**
  * @route   GET /api/products
  * @desc    Get all products (with filters, pagination, search)
  * @access  Public
  * @query   page, limit, category, search, minPrice, maxPrice, brand, indicator, productType, sortBy, sortOrder, inStock
  */
-router.get("/", productController.getAllProducts);
+router.get("/", productController.getAllProductsWithFilters);
 
 /**
  * @route   GET /api/products/:productId
@@ -89,14 +101,7 @@ router.post(
   ]),
   productController.addProduct
 );
-router.post(
-  "/",
-  authenticate,
-  authorizePermission("can_manage_products"),
-  //  uploadProductImages.array('otherImages', 10), // For array of files
-  // uploadProductImages.single('mainImage'), // For single file
-  productController.addProduct
-);
+
 
 
 
@@ -105,10 +110,14 @@ router.post(
  * @desc    Update product
  * @access  Private (Vendor only - own products)
  */
-router.put(
-  "/:productId",
+router.patch(
+  "/:id",
   authenticate,
   authorizePermission("can_manage_products"),
+  uploadProductImages.fields([
+    { name: 'mainImage', maxCount: 1 },
+    { name: 'otherImages', maxCount: 10 }
+  ]),
   productController.updateProduct
 );
 
@@ -168,6 +177,13 @@ router.patch(
   authenticate,
   checkIfAdmin,
   productController.approveProduct
+);
+
+router.get(
+  "/getAllProducts",
+  authenticate,
+  authorizePermission("can_manage_products"),
+  productController.getAllProducts
 );
 
 module.exports = router;

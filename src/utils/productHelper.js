@@ -348,79 +348,48 @@ function updateDigitalProduct(product, body, toBool) {
 function updateProductTypeData(product, body, toInt, toFloat, toArray, isDefined) {
   const { productType } = product;
 
-  // Update Simple Product
+   // Simple Product
   if (productType === PRODUCT_TYPES.SIMPLE) {
-    if (!product.simpleProduct) product.simpleProduct = {};
-
-    if (isDefined(body.sp_price || body.simpleProduct?.sp_price)) {
-      product.simpleProduct.sp_price = toFloat(body.sp_price || body.simpleProduct?.sp_price);
-    }
-    if (isDefined(body.sp_specialPrice || body.simpleProduct?.sp_specialPrice)) {
-      product.simpleProduct.sp_specialPrice = (body.sp_specialPrice || body.simpleProduct?.sp_specialPrice)
-        ? toFloat(body.sp_specialPrice || body.simpleProduct?.sp_specialPrice)
-        : undefined;
-    }
-    if (isDefined(body.sp_sku || body.simpleProduct?.sp_sku)) {
-      product.simpleProduct.sp_sku = body.sp_sku || body.simpleProduct?.sp_sku;
-    }
-    if (isDefined(body.sp_totalStock || body.simpleProduct?.sp_totalStock)) {
-      product.simpleProduct.sp_totalStock = toInt(body.sp_totalStock || body.simpleProduct?.sp_totalStock || 0);
-    }
-    if (isDefined(body.sp_stockStatus || body.simpleProduct?.sp_stockStatus)) {
-      product.simpleProduct.sp_stockStatus = body.sp_stockStatus || body.simpleProduct?.sp_stockStatus || STOCK_STATUS.IN_STOCK;
-    }
+    productData.simpleProduct = {
+      sp_price: toFloat(body.sp_price || body.simpleProduct.sp_price),
+      sp_specialPrice:body.sp_specialPrice || body.simpleProduct.sp_specialPrice? toFloat(body.sp_specialPrice || body.simpleProduct.sp_specialPrice) : undefined,
+      sp_sku: body.sp_sku || body.simpleProduct.sp_sku,
+      sp_totalStock: toInt(body.sp_totalStock || body.simpleProduct.sp_totalStock || 0),
+      sp_stockStatus: body.sp_stockStatus ||  body.simpleProduct.sp_stockStatus || STOCK_STATUS.IN_STOCK,
+    };
   }
 
-  // Update Digital Product
+  // Digital Product
   if (productType === PRODUCT_TYPES.DIGITAL) {
-    if (!product.simpleProduct) product.simpleProduct = {};
-
-    if (isDefined(body.sp_price || body.simpleProduct?.sp_price)) {
-      product.simpleProduct.sp_price = toFloat(body.sp_price || body.simpleProduct?.sp_price);
-    }
-    if (isDefined(body.sp_specialPrice || body.simpleProduct?.sp_specialPrice)) {
-      product.simpleProduct.sp_specialPrice = (body.sp_specialPrice || body.simpleProduct?.sp_specialPrice)
-        ? toFloat(body.sp_specialPrice || body.simpleProduct?.sp_specialPrice)
-        : undefined;
-    }
-    if (isDefined(body.sp_sku || body.simpleProduct?.sp_sku)) {
-      product.simpleProduct.sp_sku = body.sp_sku || body.simpleProduct?.sp_sku || "";
-    }
-    if (isDefined(body.sp_totalStock || body.simpleProduct?.sp_totalStock)) {
-      product.simpleProduct.sp_totalStock = toInt(body.sp_totalStock || body.simpleProduct?.sp_totalStock || 0);
-    }
-    // Digital products always have IN_STOCK status
-    product.simpleProduct.sp_stockStatus = STOCK_STATUS.IN_STOCK;
-  }
-
-  // Update Variable Product
-  if (productType === PRODUCT_TYPES.VARIABLE) {
-    // Only rebuild variants if variant data is provided
-    if (isDefined(body.variants) || isDefined(body.variants_ids) || isDefined(body.variant_price)) {
-      product.variants = buildVariants(body, toInt, toFloat);
-    }
-
-    // Update product level stock if applicable
-    if (body.variantStockLevelType === VARIANT_STOCK_LEVEL_TYPES.PRODUCT_LEVEL) {
-      if (!product.productLevelStock) product.productLevelStock = {};
-
-      if (isDefined(body.pls_sku || body.productLevelStock?.pls_sku)) {
-        product.productLevelStock.pls_sku = body.pls_sku || body.productLevelStock?.pls_sku || "";
-      }
-      if (isDefined(body.pls_totalStock || body.productLevelStock?.pls_totalStock)) {
-        product.productLevelStock.pls_totalStock = toInt(body.pls_totalStock || body.productLevelStock?.pls_totalStock || 0);
-      }
-      if (isDefined(body.pls_stockStatus || body.productLevelStock?.pls_stockStatus)) {
-        product.productLevelStock.pls_stockStatus = body.pls_stockStatus || body.productLevelStock?.pls_stockStatus || STOCK_STATUS.IN_STOCK;
-      }
-    }
-    
-    // If changing stock level type, ensure consistency
-    if (isDefined(body.variantStockLevelType || body.productType)) {
+    productData.simpleProduct = {
+      sp_price: toFloat(body.sp_price || body.simpleProduct.sp_price),
+      sp_specialPrice: body.sp_specialPrice || body.simpleProduct.sp_specialPrice ? toFloat(body.sp_specialPrice || body.simpleProduct.sp_specialPrice) : undefined,
+      sp_sku: body.sp_sku || body.simpleProduct.sp_sku || "",
+      sp_totalStock: toInt(body.sp_totalStock || body.simpleProduct.sp_totalStock || 0), 
+      sp_stockStatus: STOCK_STATUS.IN_STOCK,
+    };
+      if (isDefined(body.variantStockLevelType || body.productType)) {
+        console.log(body.variantStockLevelType)
+        console.log(body.productType)
       // If switching from product-level to variant-level, remove productLevelStock
       if ((body.variantStockLevelType === VARIANT_STOCK_LEVEL_TYPES.VARIABLE_LEVEL) && (body.productType === PRODUCT_TYPES.DIGITAL)) {
         delete product.productLevelStock;
       }
+    }
+  }
+
+  // Variable Product
+  if (productType === PRODUCT_TYPES.VARIABLE) {
+    productData.variants = buildVariants(body, toInt, toFloat);
+
+    // Product level stock management
+    if (body.variantStockLevelType === VARIANT_STOCK_LEVEL_TYPES.PRODUCT_LEVEL) {
+      console.log(productData)
+      productData.productLevelStock = {
+        pls_sku: body.pls_sku || body.productLevelStock.pls_sku || "",
+        pls_totalStock: toInt(body.pls_totalStock || body.productLevelStock.pls_totalStock || 0),
+        pls_stockStatus:body.pls_stockStatus || body.productLevelStock.pls_stockStatus || STOCK_STATUS.IN_STOCK,
+      };
     }
   }
 }
