@@ -33,7 +33,13 @@ router.get(
  * @access  Public
  * @query   page, limit, category, search, minPrice, maxPrice, brand, indicator, productType, sortBy, sortOrder, inStock
  */
-router.get("/", productController.getAllProductsWithFilters);
+router.get(
+  "/getAllProducts",
+  authenticate,
+  checkIfAdmin,
+  productController.getAllProducts
+);
+
 
 /**
  * @route   GET /api/products/:productId

@@ -541,6 +541,7 @@ productSchema.virtual("discountPercentage").get(function () {
   return 0;
 });
 
+//if product is in stock
 productSchema.virtual("inStock").get(function () {
   if (this.productType === PRODUCT_TYPES.SIMPLE) {
     return this.simpleProduct?.sp_stockStatus === STOCK_STATUS.IN_STOCK;
