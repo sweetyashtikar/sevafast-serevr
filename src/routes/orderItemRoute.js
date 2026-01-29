@@ -24,25 +24,25 @@ const {authenticate} = require('../middleware/authMiddleware');
 
 
 //create order
-router.post('/',authenticate,createOrderItem )
+router.post('/',authenticate,createOrderItem ) // done
 
 //bulk create order ITems
 // router.post('/bulk',bulkCreateOrderItems)
 
 //get all order item
-router.get('/', getAllOrderItems)
+router.get('/', getAllOrderItems)//done
 
 //get order Item by Id
-router.get('/:order_id', authenticate,getOrderItemById)
+router.get('/:order_id', authenticate,getOrderItemById)//done
 
 // 5. READ - Get order items by order ID
-router.get('/:order_id', getOrderItemsByOrder)
+router.get('/OrderItem/:order_id', getOrderItemsByOrder)//done
 
 // 6. UPDATE - Update order item status
-router.put('/:id', updateOrderItemStatus)
+router.put('/updateOrderItem/:id', updateOrderItemStatus)//done
 
 // 7. UPDATE - Update order item details
-router.put('/:id', updateOrderItem)
+router.put('/updateOrderItemDetails/:id', updateOrderItem)
 
 // 8. UPDATE - Mark commission as credited
 router.put('/:id', markCommissionAsCredited)
@@ -54,13 +54,13 @@ router.patch('/order-item/:id/cancel',authenticate, cancelOrderItem);
 router.get('/:seller_id', getSellerPerformance)
 
 //11. get all the order of the user
-router.get('/getUserOrders/:user_id', authenticate, getUserOrders)
+router.get('/User/my-orders', authenticate, getUserOrders);//done
 
 //12. update order status
-router.put('/:order_id', updateOrderStatus)
+router.patch('/:order_id', updateOrderStatus)//done
 
 //13. ASSIGN DELIVERY BOY
-router.post('/:order_id', assignDeliveryBoy)
+router.put('/assignDeliveryBoy/:order_id', assignDeliveryBoy)//done
 
 //14. verify delivery otp
 router.post('/:order_id',verifyDeliveryOTP)

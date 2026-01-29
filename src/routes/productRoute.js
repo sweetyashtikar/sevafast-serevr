@@ -179,11 +179,11 @@ router.patch(
   productController.approveProduct
 );
 
-router.get(
-  "/getAllProducts",
-  authenticate,
-  authorizePermission("can_manage_products"),
-  productController.getAllProducts
-);
+// router.get(
+//   "/getAllProducts",
+//   authenticate,
+//   authorizePermission("can_manage_products"),
+//   productController.getAllProducts
+// );
 
 module.exports = router;

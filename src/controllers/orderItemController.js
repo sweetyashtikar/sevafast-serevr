@@ -636,7 +636,11 @@ const getOrderItemsByOrder = async (req, res) => {
         const { 
             seller_id, 
             active_status,
-            group_by_seller = 'false'
+            group_by_seller, // Added this parameter
+            populate_seller = 'true',
+            populate_product = 'true',
+            limit,
+            page = 1
         } = req.query;
 
         // Validate order ID
@@ -648,7 +652,7 @@ const getOrderItemsByOrder = async (req, res) => {
         }
 
         // Check if order exists
-        const order = await Order.findById(order_id);
+        const order = await Order.findById(order_id).select('order_number status total payment total_payable final_total');
         if (!order) {
             return res.status(404).json({
                 success: false,
@@ -670,56 +674,119 @@ const getOrderItemsByOrder = async (req, res) => {
         }
         
         if (active_status) {
+            // Validate active_status against enum values
+            const validStatuses = ['awaiting', 'received', 'processed', 'shipped', 'delivered', 'cancelled', 'returned'];
+            if (!validStatuses.includes(active_status)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Invalid active_status value'
+                });
+            }
             query.active_status = active_status;
         }
 
-        // Get order items
-        const orderItems = await OrderItem.find(query)
-            .populate('seller_id', 'username shop_name')
-            .populate('product_variant_id', 'sku')
-            .populate({
+        // Build population options
+        const populateOptions = [];
+        
+        if (populate_seller === 'true') {
+            populateOptions.push({
+                path: 'seller_id',
+                select: 'username shop_name email mobile profile_image'
+            });
+        }
+        
+        if (populate_product === 'true') {
+            populateOptions.push({
                 path: 'product_variant_id',
+                select: 'sku variant_images',
                 populate: {
                     path: 'product_id',
-                    select: 'name images'
+                    select: 'name images category_id brand_id'
                 }
-            })
-            .sort({ date_added: 1 })
-            .lean();
+            });
+        }
+
+        // Build delivery boy population if needed
+        populateOptions.push({
+            path: 'delivery_boy_id',
+            select: 'username mobile',
+            model: 'User'
+        });
+
+        // Calculate pagination
+        const itemsPerPage = limit ? parseInt(limit) : 20;
+        const skip = (parseInt(page) - 1) * itemsPerPage;
+
+        // Get order items with pagination
+        const orderItemsQuery = OrderItem.find(query);
+        
+        // Apply population
+        if (populateOptions.length > 0) {
+            populateOptions.forEach(option => {
+                orderItemsQuery.populate(option);
+            });
+        }
+
+        // Apply sorting and pagination
+        orderItemsQuery.sort({ date_added: 1 });
+        
+        if (limit) {
+            orderItemsQuery.skip(skip).limit(itemsPerPage);
+        }
+
+        const orderItems = await orderItemsQuery.lean();
+
+        // Get total count for pagination
+        const totalItems = await OrderItem.countDocuments(query);
 
         // Group by seller if requested
         let groupedData = null;
         if (group_by_seller === 'true') {
             groupedData = {};
             orderItems.forEach(item => {
+                if (!item.seller_id) return;
+                
                 const sellerId = item.seller_id._id.toString();
                 if (!groupedData[sellerId]) {
                     groupedData[sellerId] = {
                         seller: item.seller_id,
                         items: [],
                         total_amount: 0,
-                        total_quantity: 0
+                        total_quantity: 0,
+                        total_commission: 0,
+                        status_summary: {}
                     };
                 }
+                
                 groupedData[sellerId].items.push(item);
                 groupedData[sellerId].total_amount += item.sub_total;
                 groupedData[sellerId].total_quantity += item.quantity;
+                groupedData[sellerId].total_commission += item.seller_commission_amount || 0;
+                
+                // Track status counts
+                const status = item.active_status;
+                groupedData[sellerId].status_summary[status] = (groupedData[sellerId].status_summary[status] || 0) + 1;
             });
         }
 
-        // Calculate order summary
+        // Calculate comprehensive order summary
         const orderSummary = {
-            total_items: orderItems.length,
+            total_items: totalItems,
             total_quantity: orderItems.reduce((sum, item) => sum + item.quantity, 0),
             total_amount: orderItems.reduce((sum, item) => sum + item.sub_total, 0),
-            sellers_count: new Set(orderItems.map(item => item.seller_id._id.toString())).size,
+            total_tax: orderItems.reduce((sum, item) => sum + (item.tax_amount || 0), 0),
+            total_discount: orderItems.reduce((sum, item) => sum + (item.discount || 0), 0),
+            total_admin_commission: orderItems.reduce((sum, item) => sum + (item.admin_commission_amount || 0), 0),
+            total_seller_commission: orderItems.reduce((sum, item) => sum + (item.seller_commission_amount || 0), 0),
+            sellers_count: new Set(orderItems.map(item => item.seller_id?._id?.toString()).filter(Boolean)).size,
             status_breakdown: orderItems.reduce((acc, item) => {
                 acc[item.active_status] = (acc[item.active_status] || 0) + 1;
                 return acc;
             }, {})
         };
 
-        res.status(200).json({
+        // Prepare response
+        const response = {
             success: true,
             message: 'Order items retrieved successfully',
             data: {
@@ -727,19 +794,37 @@ const getOrderItemsByOrder = async (req, res) => {
                     id: order._id,
                     order_number: order.order_number,
                     status: order.status,
-                    total: order.total
+                    total: order.total,
+                    total_payable: order.total_payable,
+                    final_total: order.final_total,
+                    payment_status: order.payment?.status
                 },
                 items: orderItems,
-                grouped_by_seller: grouped_by_seller === 'true' ? Object.values(groupedData) : undefined,
-                summary: orderSummary
+                summary: orderSummary,
+                pagination: limit ? {
+                    current_page: parseInt(page),
+                    items_per_page: itemsPerPage,
+                    total_pages: Math.ceil(totalItems / itemsPerPage),
+                    total_items: totalItems,
+                    has_next_page: skip + orderItems.length < totalItems,
+                    has_previous_page: page > 1
+                } : undefined
             }
-        });
+        };
+
+        // Add grouped data if requested
+        if (group_by_seller === 'true' && groupedData) {
+            response.data.grouped_by_seller = Object.values(groupedData);
+        }
+
+        res.status(200).json(response);
 
     } catch (error) {
         console.error('Error fetching order items:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to fetch order items'
+            message: 'Failed to fetch order items',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }
 };
@@ -894,12 +979,12 @@ const updateOrderItem = async (req, res) => {
         }
 
         // Check if item can be modified
-        if (!canModifyOrderItem(orderItem)) {
-            return res.status(400).json({
-                success: false,
-                message: `Cannot modify order item in ${orderItem.active_status} status`
-            });
-        }
+        // if (!canModifyOrderItem(orderItem)) {
+        //     return res.status(400).json({
+        //         success: false,
+        //         message: `Cannot modify order item in ${orderItem.active_status} status`
+        //     });
+        // }
 
         // Allowed fields to update
         const allowedFields = [
@@ -1427,49 +1512,141 @@ const getSellerPerformance = async (req, res) => {
 
 //11. GET ALL THE ORDER OF THE USER
 const getUserOrders = async (req, res) => {
+    console.log("getUserOrders called");
+    
     try {
-      const user_id = req.user._id;
-      const { page = 1, limit = 10, status } = req.query;
-      
-      const query = { user_id };
-      if (status) query.status = status;
-      
-      const orders = await Order.find(query)
-        .sort({ createdAt: -1 })
-        .limit(limit * 1)
-        .skip((page - 1) * limit)
-        .lean();
-      
-      const count = await Order.countDocuments(query);
-      
-      // Get order items for each order
-      const ordersWithItems = await Promise.all(
-        orders.map(async (order) => {
-          const items = await OrderItem.find({ order_id: order._id });
-          return { ...order, items };
-        })
-      );
-      console.log(" ordersWithItems ", ordersWithItems);
-      
-      res.json({
-        success: true,
-        data: ordersWithItems,
-        pagination: {
-          total: count,
-          page: parseInt(page),
-          pages: Math.ceil(count / limit)
+        // Get user ID from authenticated user
+        const user_id = req.user._id;
+        console.log("User ID:", user_id);
+        
+        // Get query parameters
+        const { page = 1, limit = 10, sort_by = 'createdAt', sort_order = 'desc' } = req.query;
+        console.log("Query params:", req.query);
+        
+        // Build query
+        const query = { user_id };
+        // if (status) {
+        //     // Validate status against enum values
+        //     const validStatuses = ['received', 'processed', 'shipped', 'delivered', 'cancelled', 'returned'];
+        //     if (validStatuses.includes(status)) {
+        //         query.status = status;
+        //     } else {
+        //         return res.status(400).json({
+        //             success: false,
+        //             message: 'Invalid status value'
+        //         });
+        //     }
+        // }
+        console.log("Query:", JSON.stringify(query));
+        
+        // Validate user exists
+        const userExists = await User.findById(user_id).select('_id');
+        if (!userExists) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
         }
-      });
-      
+        
+        // Build sort object
+        const sort = {};
+        sort[sort_by] = sort_order === 'desc' ? -1 : 1;
+        
+        // Get orders with pagination
+        const orders = await Order.find(query)
+            .select('order_number status total final_total payment createdAt updatedAt')
+            .sort(sort)
+            .limit(parseInt(limit))
+            .skip((parseInt(page) - 1) * parseInt(limit))
+            .lean();
+        
+        console.log("Orders found:", orders.length);
+        
+        // If no orders found, return empty array
+        if (orders.length === 0) {
+            return res.json({
+                success: true,
+                message: 'No orders found for this user',
+                data: [],
+                pagination: {
+                    total: 0,
+                    page: parseInt(page),
+                    pages: 0,
+                    limit: parseInt(limit)
+                }
+            });
+        }
+        
+        // Get all order IDs for batch query
+        const orderIds = orders.map(order => order._id);
+        
+        // Get all order items for these orders in a single query
+        const orderItems = await OrderItem.find({ order_id: { $in: orderIds } })
+            .populate('seller_id', 'shop_name username')
+            .populate('product_id', 'name images')
+            .populate('product_variant_id', 'variant_name price')
+            .lean();
+        
+        console.log("Order items found:", orderItems.length);
+        
+        // Group order items by order_id
+        const itemsByOrderId = orderItems.reduce((acc, item) => {
+            const orderId = item.order_id.toString();
+            if (!acc[orderId]) {
+                acc[orderId] = [];
+            }
+            acc[orderId].push(item);
+            return acc;
+        }, {});
+        
+        // Attach items to their respective orders
+        const ordersWithItems = orders.map(order => {
+            const orderId = order._id.toString();
+            return {
+                ...order,
+                items: itemsByOrderId[orderId] || []
+            };
+        });
+        
+        // Get total count for pagination
+        const totalCount = await Order.countDocuments(query);
+        
+        console.log("Orders with items prepared:", ordersWithItems.length);
+        
+        // Calculate summary statistics
+        const summary = {
+            total_orders: totalCount,
+            total_amount: orders.reduce((sum, order) => sum + (order.final_total || 0), 0),
+            status_counts: orders.reduce((acc, order) => {
+                acc[order.status] = (acc[order.status] || 0) + 1;
+                return acc;
+            }, {})
+        };
+        
+        res.json({
+            success: true,
+            message: 'Orders retrieved successfully',
+            data: ordersWithItems,
+            summary: summary,
+            pagination: {
+                total: totalCount,
+                page: parseInt(page),
+                pages: Math.ceil(totalCount / parseInt(limit)),
+                limit: parseInt(limit),
+                has_next: (parseInt(page) * parseInt(limit)) < totalCount,
+                has_prev: parseInt(page) > 1
+            }
+        });
+        
     } catch (error) {
-        console.log(error)
-      res.status(500).json({
-        success: false,
-        message: 'Failed to fetch orders',
-        error: error.message
-      });
+        console.error('Error in getUserOrders:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch orders',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
     }
-}
+};
 
 //12. update order status
 const updateOrderStatus = async (req, res) => {
@@ -1508,7 +1685,10 @@ const updateOrderStatus = async (req, res) => {
 const assignDeliveryBoy = async (req, res) => {
     try {
       const { order_id } = req.params;
-      const { delivery_boy_id, time_slot, date } = req.body;
+      console.log("order_id", order_id);
+      const { delivery_boy_id} = req.body;
+      const time_slot = req.body.time_slot || new Date().toISOString().slice(11, 16);
+      const date = req.body.date || new Date().toISOString().slice(0, 10);
       
       const order = await Order.findById(order_id);
       
@@ -1536,7 +1716,7 @@ const assignDeliveryBoy = async (req, res) => {
       res.json({
         success: true,
         message: 'Delivery boy assigned successfully',
-        data: { otp: order.delivery_info.otp }
+        data: { id : order._id,boy_id: order.delivery_info.boy_id, otp: order.delivery_info.otp }
       });
       
     } catch (error) {
@@ -1979,6 +2159,95 @@ const mapItemStatusToOrderStatus = (itemStatus) => {
     };
     
     return mapping[itemStatus] || 'received';
+};
+
+const getOrderItemsBySeller = async (req, res) => {
+    try {
+        const { seller_id } = req.params;
+        const { 
+            active_status,
+            start_date,
+            end_date,
+            page = 1,
+            limit = 20
+        } = req.query;
+
+        // Validate seller ID
+        if (!mongoose.Types.ObjectId.isValid(seller_id)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid Seller ID format'
+            });
+        }
+
+        // Build query
+        const query = { seller_id };
+        
+        if (active_status) {
+            query.active_status = active_status;
+        }
+
+        // Date range filter
+        if (start_date || end_date) {
+            query.date_added = {};
+            if (start_date) {
+                query.date_added.$gte = new Date(start_date);
+            }
+            if (end_date) {
+                query.date_added.$lte = new Date(end_date);
+            }
+        }
+
+        // Pagination
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+
+        // Get order items with pagination
+        const orderItems = await OrderItem.find(query)
+            .populate('order_id', 'order_number status payment')
+            .populate('user_id', 'username mobile email')
+            .populate('product_variant_id', 'sku')
+            .sort({ date_added: -1 })
+            .skip(skip)
+            .limit(parseInt(limit))
+            .lean();
+
+        // Get total count
+        const totalItems = await OrderItem.countDocuments(query);
+
+        // Calculate seller statistics
+        const stats = {
+            total_items: totalItems,
+            total_revenue: orderItems.reduce((sum, item) => sum + item.sub_total, 0),
+            total_commission: orderItems.reduce((sum, item) => sum + (item.seller_commission_amount || 0), 0),
+            total_quantity: orderItems.reduce((sum, item) => sum + item.quantity, 0),
+            status_breakdown: orderItems.reduce((acc, item) => {
+                acc[item.active_status] = (acc[item.active_status] || 0) + 1;
+                return acc;
+            }, {})
+        };
+
+        res.status(200).json({
+            success: true,
+            message: 'Order items retrieved successfully',
+            data: {
+                order_items: orderItems,
+                statistics: stats,
+                pagination: {
+                    current_page: parseInt(page),
+                    items_per_page: parseInt(limit),
+                    total_pages: Math.ceil(totalItems / parseInt(limit)),
+                    total_items: totalItems
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error('Error fetching seller order items:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch seller order items'
+        });
+    }
 };
 
 // Modified version for your OrderStatus enum
