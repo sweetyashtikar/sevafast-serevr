@@ -117,7 +117,7 @@ const orderSchema = new mongoose.Schema({
     status: {
         type: String,
         enum: Object.values(OrderStatus),
-        default: OrderStatus.RECEIVED,
+        default: OrderStatus.PROCESSED,
         index: true
     },
 

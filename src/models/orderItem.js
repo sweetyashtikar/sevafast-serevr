@@ -40,7 +40,6 @@ const orderItemSchema = new mongoose.Schema(
     },
     product_variant_id: {
       type: mongoose.Schema.Types.ObjectId,
-      required: true,
     },
 
     // Snapshots (Storing names directly so they persist if the product is deleted)

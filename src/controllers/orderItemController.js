@@ -7,7 +7,7 @@ const Address = require('../models/address');
 const {checkId, checkStatus} = require('../utils/sanitizer');
 const {PaymentMethod} = require('../models/orders');
 const {PRODUCT_TYPES, STOCK_STATUS} = require('../types/productTypes');
-
+const {emailService} = require('../utils/sendmail');
 /**
  * ORDER ITEM CRUD CONTROLLER
  */
@@ -35,6 +35,9 @@ const createOrderItem = async (req, res) => {
         
         // Validate User and Address IDs
         await checkId(User, user_id);
+
+        // Fetch user details for email
+        const user = await User.findById(user_id).select('name email phone username');
         
         // Fetch address with populated area and city
         const userAddress = await Address.findById(address_id)
@@ -46,7 +49,6 @@ const createOrderItem = async (req, res) => {
                 path: 'city_id',
                 select: 'name active'
             });
-        console.log(" userAddress ", userAddress);
         
         if (!userAddress) {
             throw new Error('Address not found');
@@ -54,9 +56,8 @@ const createOrderItem = async (req, res) => {
 
         // Get delivery charge from area and convert to number
         const areaDeliveryCharge = parseFloat(userAddress.area_id.delivery_charges) || 0;
-        console.log(" areaDeliveryCharge ", areaDeliveryCharge);
         const minimumFreeDeliveryAmount = parseFloat(userAddress.area_id.minimum_free_delivery_order_amount) || 0;
-        console.log(" minimumFreeDeliveryAmount ", minimumFreeDeliveryAmount);
+
         
         // Group items by product to efficiently validate variants
         const productVariantMap = {};
@@ -83,39 +84,40 @@ const createOrderItem = async (req, res) => {
                 throw new Error(`Product ${productId} is not available`);
             }
             
+            if(items.product_variant_id){
             // For each variant in this product
-            for (const variantInfo of variants) {
-                const variant = product.variants.id(variantInfo.variantId);
-                
-                if (!variant) {
-                    throw new Error(`Variant ${variantInfo.variantId} not found in product ${productId}`);
-                }
-                
-                if (!variant.variant_isActive) {
-                    throw new Error(`Variant ${variantInfo.variantId} is not active`);
-                }
-                
-                // Check stock availability
-                if (product.productType === PRODUCT_TYPES.SIMPLE) {
-                    // For simple products, check simple product stock
-                    if (product.simpleProduct.sp_stockStatus !== STOCK_STATUS.IN_STOCK || 
-                        product.simpleProduct.sp_totalStock < variantInfo.quantity) {
-                        throw new Error(`Insufficient stock for product ${product.name}`);
+                for (const variantInfo of variants) {
+                    const variant = product.variants.id(variantInfo.variantId);
+                    
+                    if (!variant) {
+                        throw new Error(`Variant ${variantInfo.variantId} not found in product ${productId}`);
                     }
-                } else if (product.productType === PRODUCT_TYPES.VARIABLE) {
-                    // For variable products, check variant stock
-                    if (variant.variant_stockStatus !== STOCK_STATUS.IN_STOCK || 
-                        variant.variant_totalStock < variantInfo.quantity) {
-                        throw new Error(`Insufficient stock for variant ${product.name}`);
+                    
+                    if (!variant.variant_isActive) {
+                        throw new Error(`Variant ${variantInfo.variantId} is not active`);
+                    }
+                    
+                    // Check stock availability
+                    if (product.productType === PRODUCT_TYPES.SIMPLE) {
+                        // For simple products, check simple product stock
+                        if (product.simpleProduct.sp_stockStatus !== STOCK_STATUS.IN_STOCK || 
+                            product.simpleProduct.sp_totalStock < variantInfo.quantity) {
+                            throw new Error(`Insufficient stock for product ${product.name}`);
+                        }
+                    } else if (product.productType === PRODUCT_TYPES.VARIABLE) {
+                        // For variable products, check variant stock
+                        if (variant.variant_stockStatus !== STOCK_STATUS.IN_STOCK || 
+                            variant.variant_totalStock < variantInfo.quantity) {
+                            throw new Error(`Insufficient stock for variant ${product.name}`);
+                        }
                     }
                 }
             }
         }
         
-        // Calculate sub_total for each item
-     const itemsWithDetails = await Promise.all(items.map(async (item) => {
+    // Calculate sub_total for each item
+    const itemsWithDetails = await Promise.all(items.map(async (item) => {
     const product = await Product.findById(item.product_id);
-    console.log("Product:", product);
     
     let variant = null;
     let price = undefined;
@@ -126,9 +128,7 @@ const createOrderItem = async (req, res) => {
     if (hasPriceInRequest) {
         // Use price from req.body
         price = parseFloat(item.price);
-        console.log("Using price from request:", price);
     }
-    console.log(" product.productType ", PRODUCT_TYPES.VARIABLE);
     if (product.productType === PRODUCT_TYPES.VARIABLE) {
         if (item.product_variant_id) {
             variant = product.variants.id(item.product_variant_id);
@@ -140,7 +140,6 @@ const createOrderItem = async (req, res) => {
             if (!hasPriceInRequest) {
                 // Use special price if available, otherwise regular price
                 price = parseFloat(variant.variant_specialPrice || variant.variant_price);
-                console.log("Using variant price from database:", price);
             }
         } else {
             throw new Error(`Variant ID required for variable product ${product.name}`);
@@ -149,8 +148,7 @@ const createOrderItem = async (req, res) => {
         // If price wasn't provided in request, get from simple product
         if (!hasPriceInRequest) {
             // Use special price if available, otherwise regular price
-            price = parseFloat(product.simpleProduct.sp_specialPrice || product.simpleProduct.sp_price);           
-            console.log("Using simple product price from database:", price);
+            price = parseFloat(product.simpleProduct.sp_specialPrice || product.simpleProduct.sp_price || product.simpleProduct.price);           
         }
     }
     
@@ -158,15 +156,17 @@ const createOrderItem = async (req, res) => {
     if (price === undefined || price === null || isNaN(price) || price <= 0) {
         throw new Error(`Invalid price for product ${product.name}. Price: ${price}`);
     }
-    console.log("Final price used:", price);
     
     const sub_total = price * item.quantity;
+    const vendorId = item.vendorId = product.vendorId;
+    console.log("vendorId", vendorId);
     
     // Create better variant name
     let variantName = product.name;
     if (variant) {
         variantName = `${product.name} - ${variant.variant_sku || 'Variant'}`;
     }
+    console.log("item", item)
     
     return {
         ...item,
@@ -174,18 +174,14 @@ const createOrderItem = async (req, res) => {
         sub_total,
         product_name: product.name,
         variant_name: variantName,
-        seller_id: product.seller_id || item.seller_id
+        seller_id: vendorId,
     };
 }));
-        console.log(" itemsWithDetails ", itemsWithDetails);
         const itemsTotal = itemsWithDetails.reduce((sum, item) => sum + item.sub_total, 0);
-        console.log(" itemsTotal ", itemsTotal);
         const promoDiscount = parseFloat(promo_details?.discount) || 0;
         
         // Determine final delivery charge based on minimum free delivery amount
         let finalDeliveryCharge = areaDeliveryCharge;
-        console.log(" finalDeliveryCharge ", finalDeliveryCharge);
-        console.log(" minimumFreeDeliveryAmount ", minimumFreeDeliveryAmount);
         if (minimumFreeDeliveryAmount > 0 && itemsTotal >= minimumFreeDeliveryAmount) {
             finalDeliveryCharge = 0; // Free delivery if order meets minimum
         }
@@ -232,7 +228,7 @@ const createOrderItem = async (req, res) => {
         const orderItems = itemsWithDetails.map(item => ({
             user_id,
             order_id: order._id,
-            seller_id: item.seller_id,
+            seller_id: item.vendorId,
             product_id: item.product_id,
             product_variant_id: item.product_variant_id,
             product_name: item.product_name,
@@ -250,6 +246,7 @@ const createOrderItem = async (req, res) => {
                 timestamp: new Date()
             }]
         }));
+        console.log(" orderItems ", orderItems);
         
         await OrderItem.insertMany(orderItems, { session });
         
@@ -276,6 +273,15 @@ const createOrderItem = async (req, res) => {
         }
         
         await session.commitTransaction();
+
+        // Send email in background (non-blocking)
+        setTimeout(() => {
+            sendOrderEmailInBackground(
+                order,
+                user,
+                itemsWithDetails
+            );
+        }, 0);
         
         res.status(201).json({
             success: true,
@@ -284,7 +290,8 @@ const createOrderItem = async (req, res) => {
                 order_id: order._id,
                 order_number: order.order_number,
                 delivery_charge: finalDeliveryCharge,
-                total: total
+                total: total,
+                email_sent: true
             }
         });
         
@@ -2742,6 +2749,33 @@ function isValidItemStatusTransition(currentStatus, newStatus) {
     
     return transitions[currentStatus]
 }
+
+// Add a background email sending function
+const sendOrderEmailInBackground = async (order, user, items) => {
+     try {
+            const emailResult = await emailService.sendOrderConfirmationEmail(
+                order,
+                user,
+                items
+            );
+            
+            console.log('Order email result:', emailResult);
+            
+            // if (emailResult.success) {
+            //     // Update order with email sent status
+            //     await Order.findByIdAndUpdate(order._id, {
+            //         $set: {
+            //             confirmation_email_sent: true,
+            //             confirmation_email_sent_at: new Date()
+            //         }
+            //     });
+            // }
+        } catch (emailError) {
+            console.error('Email sending failed:', emailError);
+            // Don't fail the order creation
+        }
+        
+};
 
 
 module.exports = {

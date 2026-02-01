@@ -32,6 +32,8 @@ const faqRoute = require('./src/routes/faqroute')
 const favouriteRoute = require('./src/routes/favouriteRoute')
 const productFaqRoute = require('./src/routes/productFAQRoute');
 const OrderItemRoute = require('./src/routes/orderItemRoute')
+const paymentRoutes = require('./src/controllers/razorpaycontroller');
+
 
 
 
@@ -78,6 +80,7 @@ app.use('/api/faq', faqRoute)
 app.use('/api/favourite', favouriteRoute)
 app.use('/api/product-faqs', productFaqRoute);
 app.use('/api/order', OrderItemRoute)
+app.use('/api/payments', paymentRoutes);
 
 
 
