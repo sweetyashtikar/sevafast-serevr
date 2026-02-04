@@ -69,7 +69,7 @@ router.post('/:order_id',verifyDeliveryOTP)
 router.post('/:order_id',cancelOrder)
 
 //16. get seller orders
-router.get('/sellerOrders',getSellerOrders)
+router.get('/get/sellerOrders',authenticate,getSellerOrders)
 
 //17. get delivery boy orders
 router.get('/deliveryBoys',getDeliveryBoyOrders)

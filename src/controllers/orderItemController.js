@@ -603,7 +603,6 @@ const getAllOrderItems = async (req, res) => {
 const getOrderItemById = async (req, res) => {
    try {
       const { order_id } = req.params;
-      console.log(" order_id ", order_id);
       const user_id = req.user._id;
       
       const order = await Order.findOne({ 
@@ -1861,11 +1860,10 @@ const cancelOrder = async (req, res)=>  {
 //16. get seller orders
 const getSellerOrders =  async (req, res) => {
     try {
-      const seller_id = req.user.id;
-      const { page = 1, limit = 10, active_status } = req.query;
+      const vendorId = req.user._id;
+      const { page = 1, limit = 10 } = req.query;
       
-      const query = { seller_id };
-      if (active_status) query.active_status = active_status;
+      const query = { user_id: vendorId };
       
       const items = await OrderItem.find(query)
         .populate('order_id')
