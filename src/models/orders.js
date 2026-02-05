@@ -111,7 +111,32 @@ const orderSchema = new mongoose.Schema({
         otp_verified: { type: Boolean, default: false },
         delivery_attempts: { type: Number, default: 0 },
         time_slot: { type: String }, // "9AM-12PM"
-        date: { type: Date }
+        date: { type: Date },
+
+        ship_type :{
+            shipping_method :{
+                type:String,
+                enum :['standard', 'express', 'shiprocket'],
+                default : 'standard'
+            },
+            //shiprocket specific details
+            shiprocket_shipment_id : String,
+            shiprocket_awb_number : String,
+            shiprocket_status : String,
+            shiprocket_label_url : String,
+            shiprocket_servicebility : Object,
+            shiprocket_response : Object,
+            shiprocket_error: String,
+            // Original delivery boy fields (keep existing)
+            boy_id: mongoose.Schema.Types.ObjectId,
+            assigned_at: Date,
+            time_slot: String,
+            date: Date,
+            otp: Number,
+            otp_verified: Boolean,
+            delivered_at: Date
+        },
+        default :{}
     },
     
     status: {

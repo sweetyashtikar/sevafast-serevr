@@ -20,7 +20,14 @@ const {createOrderItem,
     assignDeliveryBoy,
     verifyDeliveryOTP
 } = require('../controllers/orderItemController');
-const {authenticate} = require('../middleware/authMiddleware');
+const {
+     cancelShipment,
+    trackShipment,
+    getShippingLabel,
+    checkShippingServiceability,
+    createShipRocketShipment
+} = require('../controllers/shiprocketController')
+const {authenticate,authorizePermission} = require('../middleware/authMiddleware');
 
 
 //create order
@@ -78,5 +85,37 @@ router.get('/deliveryBoys',getDeliveryBoyOrders)
 router.post('/processrefund',processRefund)
 
 router.get('/orderAnalystics',getOrderAnalytics)
+
+//shiprocket
+// Check shipping serviceability
+router.post('/shiprocket/check-shipping',
+    authenticate,
+    checkShippingServiceability
+);
+
+// Create ShipRocket shipment (admin only)
+router.post('/shiprocket/:order_id/create-shipment',
+    authenticate,
+    authorizePermission("can_manage_products"),
+    createShipRocketShipment
+);
+
+// Get shipping label
+router.get('/shiprocket/:order_id/shipping-label',
+    authenticate,
+    getShippingLabel
+);
+// Track shipment
+router.get('/shiprocket/:order_id/track',
+    authenticate,
+    trackShipment
+);
+
+// Cancel shipment
+router.post('/:order_id/cancel-shipment',
+    authenticate,
+    authorizePermission('can_manage_products'),
+    cancelShipment
+);
 
 module.exports = router
