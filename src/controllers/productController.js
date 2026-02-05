@@ -669,7 +669,7 @@ const getAllProductsWithFilters = async (req, res) => {
 const getVendorProducts = async (req, res) => {
   try {
     const vendorId = req.user._id;
-    const { limit, offset, sort, searchQuery, filters } = req.paginationQuery;
+    const { limit, offset, sort, searchQuery, filters,skip } = req.paginationQuery;
 
     // Build query
     const query = {
@@ -678,13 +678,6 @@ const getVendorProducts = async (req, res) => {
       isDeleted: false,
     };
 
-    if (filters.status !== undefined) {
-      query.status = filters.status === true;
-    }
-
-    if (filters.productType) {
-      query.productType = filtersproductType;
-    }
 
     // Execute query
     const products = await Product.find(query)

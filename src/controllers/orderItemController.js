@@ -1004,8 +1004,7 @@ const getAllOrderItems = async (req, res) => {
 const getOrderItemById = async (req, res) => {
     try {
         const { order_id } = req.params;
-        console.log(" order_id ", order_id);
-        const user_id = req.user._id;
+          const user_id = req.user._id;
 
         const order = await Order.findOne({
             _id: order_id,
@@ -2262,31 +2261,30 @@ const cancelOrder = async (req, res) => {
 //16. get seller orders
 const getSellerOrders = async (req, res) => {
     try {
-        const seller_id = req.user.id;
-        const { page = 1, limit = 10, active_status } = req.query;
-
-        const query = { seller_id };
-        if (active_status) query.active_status = active_status;
-
-        const items = await OrderItem.find(query)
-            .populate('order_id')
-            .populate('product_variant_id', 'images')
-            .sort({ createdAt: -1 })
-            .limit(limit * 1)
-            .skip((page - 1) * limit);
-
-        const count = await OrderItem.countDocuments(query);
-
-        res.json({
-            success: true,
-            data: items,
-            pagination: {
-                total: count,
-                page: parseInt(page),
-                pages: Math.ceil(count / limit)
-            }
-        });
-
+      const vendorId = req.user._id;
+      const { page = 1, limit = 10 } = req.query;
+      
+      const query = { user_id: vendorId };
+      
+      const items = await OrderItem.find(query)
+        .populate('order_id')
+        .populate('product_variant_id', 'images')
+        .sort({ createdAt: -1 })
+        .limit(limit * 1)
+        .skip((page - 1) * limit);
+      
+      const count = await OrderItem.countDocuments(query);
+      
+      res.json({
+        success: true,
+        data: items,
+        pagination: {
+          total: count,
+          page: parseInt(page),
+          pages: Math.ceil(count / limit)
+        }
+      });
+      
     } catch (error) {
         res.status(500).json({
             success: false,
