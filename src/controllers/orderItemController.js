@@ -9,6 +9,8 @@ const { PaymentMethod } = require('../models/orders');
 const { PRODUCT_TYPES, STOCK_STATUS } = require('../types/productTypes');
 const { emailService } = require('../utils/sendmail');
 const ShipRocketService = require('../services/shiprocket.service');
+
+const tezGateway = require('../services/texPayment')
 /**
  * ORDER ITEM CRUD CONTROLLER
  */
@@ -343,6 +345,395 @@ const ShipRocketService = require('../services/shiprocket.service');
 //     }
 // };
 
+// const createOrderItem = async (req, res) => {
+//     const session = await mongoose.startSession();
+//     session.startTransaction();
+
+//     try {
+//         const {
+//             address_id,
+//             mobile,
+//             address,
+//             location,
+//             items,
+//             payment_method,
+//             promo_details,
+//             discount,
+//             tax_amount,
+//             delivery_info,
+//             shipping_method = 'standard' // Add shipping method option
+//         } = req.body;
+
+//         const user_id = req.user._id;
+
+//         // Validate User and Address IDs
+//         await checkId(User, user_id);
+
+//         // Fetch user details for email
+//         const user = await User.findById(user_id).select('name email phone username');
+
+//         // Fetch address with populated area and city
+//         const userAddress = await Address.findById(address_id)
+//             .populate({
+//                 path: 'area_id',
+//                 select: 'delivery_charges minimum_free_delivery_order_amount name active'
+//             })
+//             .populate({
+//                 path: 'city_id',
+//                 select: 'name active pincode' // Added pincode here
+//             });
+
+//         if (!userAddress) {
+//             throw new Error('Address not found');
+//         }
+
+//         // Get delivery charge from area and convert to number
+//         const areaDeliveryCharge = parseFloat(userAddress.area_id.delivery_charges) || 0;
+//         const minimumFreeDeliveryAmount = parseFloat(userAddress.area_id.minimum_free_delivery_order_amount) || 0;
+
+//         // Check ShipRocket serviceability if shipping_method is 'shiprocket'
+//         let shiprocketServiceability = null;
+//         let shiprocketDeliveryCharge = areaDeliveryCharge;
+//         let totalWeight = 0;
+
+//         if (shipping_method === 'shiprocket') {
+//             try {
+//                 const pincode = userAddress.pincode || userAddress.city_id?.pincode;
+//                 if (!pincode) {
+//                     throw new Error('Pincode not found for address');
+//                 }
+                
+//                 // Calculate total weight of items
+//                 totalWeight = items.reduce((sum, item) => {
+//                     // You might want to fetch actual product weight from database
+//                     return sum + (item.quantity * 0.5); // Assuming 0.5kg per item
+//                 }, 0);
+                
+//                 // Check serviceability
+//                 shiprocketServiceability = await ShipRocketService.checkServiceability(
+//                     pincode,
+//                     totalWeight || 0.5,
+//                     15, // length in cm
+//                     15, // breadth in cm
+//                     15  // height in cm
+//                 );
+                
+//                 if (shiprocketServiceability && shiprocketServiceability.data.available) {
+//                     // Use ShipRocket's freight charge if available
+//                     shiprocketDeliveryCharge = parseFloat(shiprocketServiceability.data.freight_charge) || areaDeliveryCharge;
+//                 } else {
+//                     // If ShipRocket not available, fall back to standard
+//                     console.warn('ShipRocket not available, falling back to standard shipping');
+//                 }
+//             } catch (shiprocketError) {
+//                 console.warn('ShipRocket serviceability check failed:', shiprocketError.message);
+//                 // Continue with default charges if ShipRocket fails
+//             }
+//         }
+
+//         // Group items by product to efficiently validate variants
+//         const productVariantMap = {};
+//         items.forEach(item => {
+//             if (!productVariantMap[item.product_id]) {
+//                 productVariantMap[item.product_id] = [];
+//             }
+//             productVariantMap[item.product_id].push({
+//                 variantId: item.product_variant_id,
+//                 quantity: item.quantity
+//             });
+//         });
+
+//         // Validate all product variants exist and have sufficient stock
+//         for (const [productId, variants] of Object.entries(productVariantMap)) {
+//             const product = await Product.findById(productId);
+
+//             if (!product) {
+//                 throw new Error(`Product ${productId} not found`);
+//             }
+
+//             // Check if product is active and approved
+//             if (!product.status || !product.isApproved || product.isDeleted) {
+//                 throw new Error(`Product ${productId} is not available`);
+//             }
+
+//             // FIXED: Changed items.product_variant_id to item.product_variant_id
+//             // For each variant in this product
+//             for (const variantInfo of variants) {
+//                 // For simple products without variants
+//                 if (!variantInfo.variantId && product.productType === PRODUCT_TYPES.SIMPLE) {
+//                     // Check stock availability for simple product
+//                     if (product.simpleProduct.sp_stockStatus !== STOCK_STATUS.IN_STOCK ||
+//                         product.simpleProduct.sp_totalStock < variantInfo.quantity) {
+//                         throw new Error(`Insufficient stock for product ${product.name}`);
+//                     }
+//                     continue;
+//                 }
+                
+//                 // For variable products with variants
+//                 const variant = product.variants.id(variantInfo.variantId);
+
+//                 if (!variant) {
+//                     throw new Error(`Variant ${variantInfo.variantId} not found in product ${productId}`);
+//                 }
+
+//                 if (!variant.variant_isActive) {
+//                     throw new Error(`Variant ${variantInfo.variantId} is not active`);
+//                 }
+
+//                 // Check stock availability
+//                 if (product.productType === PRODUCT_TYPES.VARIABLE) {
+//                     if (variant.variant_stockStatus !== STOCK_STATUS.IN_STOCK ||
+//                         variant.variant_totalStock < variantInfo.quantity) {
+//                         throw new Error(`Insufficient stock for variant ${product.name}`);
+//                     }
+//                 }
+//             }
+//         }
+
+//         // Calculate sub_total for each item
+//         const itemsWithDetails = await Promise.all(items.map(async (item) => {
+//             const product = await Product.findById(item.product_id);
+
+//             let variant = null;
+//             let price = undefined;
+
+//             // Check if price was explicitly provided in req.body
+//             const hasPriceInRequest = item.price !== undefined && item.price !== null;
+
+//             if (hasPriceInRequest) {
+//                 // Use price from req.body
+//                 price = parseFloat(item.price);
+//             }
+            
+//             if (product.productType === PRODUCT_TYPES.VARIABLE) {
+//                 if (item.product_variant_id) {
+//                     variant = product.variants.id(item.product_variant_id);
+//                     if (!variant) {
+//                         throw new Error(`Variant ${item.product_variant_id} not found`);
+//                     }
+
+//                     // If price wasn't provided in request, get from variant
+//                     if (!hasPriceInRequest) {
+//                         // Use special price if available, otherwise regular price
+//                         price = parseFloat(variant.variant_specialPrice || variant.variant_price);
+//                     }
+//                 } else {
+//                     throw new Error(`Variant ID required for variable product ${product.name}`);
+//                 }
+//             } else if (product.productType === PRODUCT_TYPES.SIMPLE) {
+//                 // If price wasn't provided in request, get from simple product
+//                 if (!hasPriceInRequest) {
+//                     // Use special price if available, otherwise regular price
+//                     price = parseFloat(product.simpleProduct.sp_specialPrice || product.simpleProduct.sp_price || product.simpleProduct.price);
+//                 }
+//             }
+
+//             // Final validation
+//             if (price === undefined || price === null || isNaN(price) || price <= 0) {
+//                 throw new Error(`Invalid price for product ${product.name}. Price: ${price}`);
+//             }
+
+//             const sub_total = price * item.quantity;
+//             const vendorId = product.vendorId;
+
+//             // Create better variant name
+//             let variantName = product.name;
+//             if (variant) {
+//                 variantName = `${product.name} - ${variant.variant_sku || 'Variant'}`;
+//             }
+
+//             return {
+//                 ...item,
+//                 price,
+//                 sub_total,
+//                 product_name: product.name,
+//                 variant_name: variantName,
+//                 vendorId: vendorId,
+//             };
+//         }));
+        
+//         const itemsTotal = itemsWithDetails.reduce((sum, item) => sum + item.sub_total, 0);
+//         const promoDiscount = parseFloat(promo_details?.discount) || 0;
+
+//         // Determine final delivery charge based on shipping method
+//         let finalDeliveryCharge;
+//         if (shipping_method === 'shiprocket') {
+//             finalDeliveryCharge = shiprocketDeliveryCharge;
+//         } else {
+//             finalDeliveryCharge = areaDeliveryCharge;
+//         }
+        
+//         // Apply free delivery if order meets minimum
+//         if (minimumFreeDeliveryAmount > 0 && itemsTotal >= minimumFreeDeliveryAmount) {
+//             finalDeliveryCharge = 0;
+//         }
+
+//         // Calculate totals
+//         const total = itemsTotal +
+//             finalDeliveryCharge -
+//             (parseFloat(discount) || 0) -
+//             promoDiscount +
+//             (parseFloat(tax_amount) || 0);
+
+//         // Check if payment method is Tez
+//         const isTezPayment = payment_method === PaymentMethod.TEZ || payment_method === 'tez';
+
+//         // **VALIDATE MOBILE FOR TEZ PAYMENT**
+//         let paymentMobile = mobile || user.phone || userAddress.mobile;
+
+//          if (isTezPayment) {
+//             // Ensure we have a mobile number for Tez payment
+//             if (!paymentMobile) {
+//                 throw new Error('Mobile number is required for Tez payment');
+//             }
+            
+//             // Validate mobile format for Tez
+//             const formattedMobile = TezGatewayCreateOrderAPI.formatMobileNumber(paymentMobile);
+//             if (!tezGateway.validateMobileNumber(formattedMobile)) {
+//                 throw new Error(`Invalid mobile number for Tez payment: ${paymentMobile}. Please provide a valid 10-digit Indian mobile number.`);
+//             }
+//             paymentMobile = formattedMobile; // Use formatted mobile
+//         }
+
+//         // Create Order with shipping method and ShipRocket data
+//         const order = new Order({
+//             user_id,
+//             address_id,
+//             mobile,
+//             address: address || userAddress.address,
+//             location: location || userAddress.location,
+//             total: itemsTotal,
+//             delivery_charge: finalDeliveryCharge,
+//             discount: discount || 0,
+//             promo_details: promo_details ? {
+//                 code: promo_details.code,
+//                 discount: parseFloat(promo_details.discount) || 0,
+//                 discount_type: promo_details.discount_type || 'fixed'
+//             } : undefined,
+//             tax_amount: parseFloat(tax_amount) || 0,
+//             total_payable: total,
+//             final_total: total,
+//             payment: {
+//                 method: payment_method,
+//                 status: isTezPayment ? 'pending' : (payment_method === PaymentMethod.COD ? 'pending' : 'pending'),
+//                 gateway: isTezPayment ? 'tez' : null
+//             },
+//             delivery_info: {
+//                 ...delivery_info,
+//                 shipping_method: shipping_method,
+//                 shiprocket_data: shipping_method === 'shiprocket' ? {
+//                     serviceability: shiprocketServiceability,
+//                     weight: totalWeight,
+//                     delivery_charge: shiprocketDeliveryCharge
+//                 } : undefined
+//             },
+//             status: 'received',
+//             status_timestamps: {
+//                 received: new Date()
+//             }
+//         });
+
+//         await order.save({ session });
+
+//         // Create Order Items
+//         const orderItems = itemsWithDetails.map(item => ({
+//             user_id,
+//             order_id: order._id,
+//             seller_id: item.vendorId,
+//             product_id: item.product_id,
+//             product_variant_id: item.product_variant_id,
+//             product_name: item.product_name,
+//             variant_name: item.variant_name,
+//             quantity: item.quantity,
+//             price: item.price,
+//             discounted_price: parseFloat(item.discounted_price) || item.price,
+//             tax_percent: parseFloat(item.tax_percent) || 0,
+//             tax_amount: parseFloat(item.tax_amount) || 0,
+//             discount: parseFloat(item.discount) || 0,
+//             sub_total: item.sub_total,
+//             active_status: 'awaiting',
+//             status_history: [{
+//                 status: 'awaiting',
+//                 timestamp: new Date()
+//             }]
+//         }));
+
+//         await OrderItem.insertMany(orderItems, { session });
+
+//         // Update product stock (important!)
+//         for (const item of itemsWithDetails) {
+//             const product = await Product.findById(item.product_id).session(session);
+
+//             if (product.productType === PRODUCT_TYPES.SIMPLE) {
+//                 product.simpleProduct.sp_totalStock -= item.quantity;
+//                 if (product.simpleProduct.sp_totalStock <= 0) {
+//                     product.simpleProduct.sp_stockStatus = STOCK_STATUS.OUT_OF_STOCK;
+//                 }
+//             } else if (product.productType === PRODUCT_TYPES.VARIABLE) {
+//                 const variant = product.variants.id(item.product_variant_id);
+//                 if (variant) {
+//                     variant.variant_totalStock -= item.quantity;
+//                     if (variant.variant_totalStock <= 0) {
+//                         variant.variant_stockStatus = STOCK_STATUS.OUT_OF_STOCK;
+//                     }
+//                 }
+//             }
+
+//             await product.save({ session });
+//         }
+
+//         await session.commitTransaction();
+
+//         // Create ShipRocket shipment for prepaid orders
+//         if (shipping_method === 'shiprocket' && payment_method !== PaymentMethod.COD) {
+//             setTimeout(async () => {
+//                 try {
+//                     await createShipRocketShipmentInBackground(order._id, user, userAddress, itemsWithDetails);
+//                 } catch (error) {
+//                     console.error('Failed to create ShipRocket shipment:', error);
+//                 }
+//             }, 1000); // Delay to ensure order is saved
+//         }
+
+//         // Send email in background (non-blocking)
+//         setTimeout(() => {
+//             sendOrderEmailInBackground(
+//                 order,
+//                 user,
+//                 itemsWithDetails
+//             );
+//         }, 0);
+
+//         res.status(201).json({
+//             success: true,
+//             message: 'Order created successfully',
+//             data: {
+//                 order_id: order._id,
+//                 order_number: order.order_number,
+//                 delivery_charge: finalDeliveryCharge,
+//                 shipping_method: shipping_method,
+//                 shiprocket_available: shipping_method === 'shiprocket' ? 
+//                     (shiprocketServiceability?.data?.available || false) : null,
+//                 total: total,
+//                 email_sent: true
+//             }
+//         });
+
+//     } catch (error) {
+//         console.error("Order creation error:", error);
+//         await session.abortTransaction();
+//         res.status(500).json({
+//             success: false,
+//             message: 'Failed to create order',
+//             error: error.message
+//         });
+//     } finally {
+//         session.endSession();
+//     }
+// };
+
+
+//with payment gateway
 const createOrderItem = async (req, res) => {
     const session = await mongoose.startSession();
     session.startTransaction();
@@ -359,7 +750,7 @@ const createOrderItem = async (req, res) => {
             discount,
             tax_amount,
             delivery_info,
-            shipping_method = 'standard' // Add shipping method option
+            shipping_method = 'standard'
         } = req.body;
 
         const user_id = req.user._id;
@@ -367,10 +758,10 @@ const createOrderItem = async (req, res) => {
         // Validate User and Address IDs
         await checkId(User, user_id);
 
-        // Fetch user details for email
+        // Fetch user details
         const user = await User.findById(user_id).select('name email phone username');
 
-        // Fetch address with populated area and city
+        // Fetch address
         const userAddress = await Address.findById(address_id)
             .populate({
                 path: 'area_id',
@@ -378,18 +769,18 @@ const createOrderItem = async (req, res) => {
             })
             .populate({
                 path: 'city_id',
-                select: 'name active pincode' // Added pincode here
+                select: 'name active pincode'
             });
 
         if (!userAddress) {
             throw new Error('Address not found');
         }
 
-        // Get delivery charge from area and convert to number
+        // Get delivery charge
         const areaDeliveryCharge = parseFloat(userAddress.area_id.delivery_charges) || 0;
         const minimumFreeDeliveryAmount = parseFloat(userAddress.area_id.minimum_free_delivery_order_amount) || 0;
 
-        // Check ShipRocket serviceability if shipping_method is 'shiprocket'
+        // ShipRocket serviceability check
         let shiprocketServiceability = null;
         let shiprocketDeliveryCharge = areaDeliveryCharge;
         let totalWeight = 0;
@@ -401,35 +792,25 @@ const createOrderItem = async (req, res) => {
                     throw new Error('Pincode not found for address');
                 }
                 
-                // Calculate total weight of items
                 totalWeight = items.reduce((sum, item) => {
-                    // You might want to fetch actual product weight from database
-                    return sum + (item.quantity * 0.5); // Assuming 0.5kg per item
+                    return sum + (item.quantity * 0.5);
                 }, 0);
                 
-                // Check serviceability
                 shiprocketServiceability = await ShipRocketService.checkServiceability(
                     pincode,
                     totalWeight || 0.5,
-                    15, // length in cm
-                    15, // breadth in cm
-                    15  // height in cm
+                    15, 15, 15
                 );
                 
-                if (shiprocketServiceability && shiprocketServiceability.data.available) {
-                    // Use ShipRocket's freight charge if available
+                if (shiprocketServiceability?.data?.available) {
                     shiprocketDeliveryCharge = parseFloat(shiprocketServiceability.data.freight_charge) || areaDeliveryCharge;
-                } else {
-                    // If ShipRocket not available, fall back to standard
-                    console.warn('ShipRocket not available, falling back to standard shipping');
                 }
             } catch (shiprocketError) {
                 console.warn('ShipRocket serviceability check failed:', shiprocketError.message);
-                // Continue with default charges if ShipRocket fails
             }
         }
 
-        // Group items by product to efficiently validate variants
+        // Validate products and stock
         const productVariantMap = {};
         items.forEach(item => {
             if (!productVariantMap[item.product_id]) {
@@ -441,25 +822,15 @@ const createOrderItem = async (req, res) => {
             });
         });
 
-        // Validate all product variants exist and have sufficient stock
         for (const [productId, variants] of Object.entries(productVariantMap)) {
             const product = await Product.findById(productId);
-
-            if (!product) {
-                throw new Error(`Product ${productId} not found`);
-            }
-
-            // Check if product is active and approved
+            if (!product) throw new Error(`Product ${productId} not found`);
             if (!product.status || !product.isApproved || product.isDeleted) {
                 throw new Error(`Product ${productId} is not available`);
             }
 
-            // FIXED: Changed items.product_variant_id to item.product_variant_id
-            // For each variant in this product
             for (const variantInfo of variants) {
-                // For simple products without variants
                 if (!variantInfo.variantId && product.productType === PRODUCT_TYPES.SIMPLE) {
-                    // Check stock availability for simple product
                     if (product.simpleProduct.sp_stockStatus !== STOCK_STATUS.IN_STOCK ||
                         product.simpleProduct.sp_totalStock < variantInfo.quantity) {
                         throw new Error(`Insufficient stock for product ${product.name}`);
@@ -467,18 +838,10 @@ const createOrderItem = async (req, res) => {
                     continue;
                 }
                 
-                // For variable products with variants
                 const variant = product.variants.id(variantInfo.variantId);
-
-                if (!variant) {
-                    throw new Error(`Variant ${variantInfo.variantId} not found in product ${productId}`);
-                }
-
-                if (!variant.variant_isActive) {
-                    throw new Error(`Variant ${variantInfo.variantId} is not active`);
-                }
-
-                // Check stock availability
+                if (!variant) throw new Error(`Variant ${variantInfo.variantId} not found`);
+                if (!variant.variant_isActive) throw new Error(`Variant ${variantInfo.variantId} is not active`);
+                
                 if (product.productType === PRODUCT_TYPES.VARIABLE) {
                     if (variant.variant_stockStatus !== STOCK_STATUS.IN_STOCK ||
                         variant.variant_totalStock < variantInfo.quantity) {
@@ -488,53 +851,31 @@ const createOrderItem = async (req, res) => {
             }
         }
 
-        // Calculate sub_total for each item
+        // Calculate item details
         const itemsWithDetails = await Promise.all(items.map(async (item) => {
             const product = await Product.findById(item.product_id);
-
             let variant = null;
-            let price = undefined;
-
-            // Check if price was explicitly provided in req.body
-            const hasPriceInRequest = item.price !== undefined && item.price !== null;
-
-            if (hasPriceInRequest) {
-                // Use price from req.body
-                price = parseFloat(item.price);
-            }
+            let price = item.price !== undefined ? parseFloat(item.price) : undefined;
             
             if (product.productType === PRODUCT_TYPES.VARIABLE) {
                 if (item.product_variant_id) {
                     variant = product.variants.id(item.product_variant_id);
-                    if (!variant) {
-                        throw new Error(`Variant ${item.product_variant_id} not found`);
-                    }
-
-                    // If price wasn't provided in request, get from variant
-                    if (!hasPriceInRequest) {
-                        // Use special price if available, otherwise regular price
+                    if (!variant) throw new Error(`Variant ${item.product_variant_id} not found`);
+                    if (price === undefined) {
                         price = parseFloat(variant.variant_specialPrice || variant.variant_price);
                     }
                 } else {
                     throw new Error(`Variant ID required for variable product ${product.name}`);
                 }
-            } else if (product.productType === PRODUCT_TYPES.SIMPLE) {
-                // If price wasn't provided in request, get from simple product
-                if (!hasPriceInRequest) {
-                    // Use special price if available, otherwise regular price
-                    price = parseFloat(product.simpleProduct.sp_specialPrice || product.simpleProduct.sp_price || product.simpleProduct.price);
-                }
+            } else if (product.productType === PRODUCT_TYPES.SIMPLE && price === undefined) {
+                price = parseFloat(product.simpleProduct.sp_specialPrice || product.simpleProduct.sp_price || product.simpleProduct.price);
             }
 
-            // Final validation
-            if (price === undefined || price === null || isNaN(price) || price <= 0) {
-                throw new Error(`Invalid price for product ${product.name}. Price: ${price}`);
+            if (!price || price <= 0 || isNaN(price)) {
+                throw new Error(`Invalid price for product ${product.name}`);
             }
 
             const sub_total = price * item.quantity;
-            const vendorId = product.vendorId;
-
-            // Create better variant name
             let variantName = product.name;
             if (variant) {
                 variantName = `${product.name} - ${variant.variant_sku || 'Variant'}`;
@@ -546,38 +887,47 @@ const createOrderItem = async (req, res) => {
                 sub_total,
                 product_name: product.name,
                 variant_name: variantName,
-                vendorId: vendorId,
+                vendorId: product.vendorId,
             };
         }));
         
         const itemsTotal = itemsWithDetails.reduce((sum, item) => sum + item.sub_total, 0);
         const promoDiscount = parseFloat(promo_details?.discount) || 0;
 
-        // Determine final delivery charge based on shipping method
-        let finalDeliveryCharge;
-        if (shipping_method === 'shiprocket') {
-            finalDeliveryCharge = shiprocketDeliveryCharge;
-        } else {
-            finalDeliveryCharge = areaDeliveryCharge;
-        }
-        
-        // Apply free delivery if order meets minimum
+        // Calculate delivery charge
+        let finalDeliveryCharge = shipping_method === 'shiprocket' ? shiprocketDeliveryCharge : areaDeliveryCharge;
         if (minimumFreeDeliveryAmount > 0 && itemsTotal >= minimumFreeDeliveryAmount) {
             finalDeliveryCharge = 0;
         }
 
-        // Calculate totals
-        const total = itemsTotal +
-            finalDeliveryCharge -
-            (parseFloat(discount) || 0) -
-            promoDiscount +
-            (parseFloat(tax_amount) || 0);
+        // Calculate total
+        const total = itemsTotal + finalDeliveryCharge - (parseFloat(discount) || 0) - promoDiscount + (parseFloat(tax_amount) || 0);
 
-        // Create Order with shipping method and ShipRocket data
+        // Check if payment method is Tez
+        const isTezPayment = payment_method === PaymentMethod.TEZ || payment_method === 'tez';
+
+        // **VALIDATE MOBILE FOR TEZ PAYMENT**
+        let paymentMobile = mobile || user.phone || userAddress.mobile;
+        
+        if (isTezPayment) {
+            // Ensure we have a mobile number for Tez payment
+            if (!paymentMobile) {
+                throw new Error('Mobile number is required for Tez payment');
+            }
+            
+            // Validate mobile format for Tez
+            const formattedMobile = tezGateway.formatMobileNumber(paymentMobile);
+            if (!tezGateway.validateMobileNumber(formattedMobile)) {
+                throw new Error(`Invalid mobile number for Tez payment: ${paymentMobile}. Please provide a valid 10-digit Indian mobile number.`);
+            }
+            paymentMobile = formattedMobile; // Use formatted mobile
+        }
+
+        // Create Order
         const order = new Order({
             user_id,
             address_id,
-            mobile,
+            mobile: paymentMobile, // Use validated/formatted mobile
             address: address || userAddress.address,
             location: location || userAddress.location,
             total: itemsTotal,
@@ -593,7 +943,8 @@ const createOrderItem = async (req, res) => {
             final_total: total,
             payment: {
                 method: payment_method,
-                status: payment_method === PaymentMethod.COD ? 'pending' : 'pending'
+                status: isTezPayment ? 'pending' : (payment_method === PaymentMethod.COD ? 'pending' : 'pending'),
+                gateway: isTezPayment ? 'tez' : null
             },
             delivery_info: {
                 ...delivery_info,
@@ -637,10 +988,9 @@ const createOrderItem = async (req, res) => {
 
         await OrderItem.insertMany(orderItems, { session });
 
-        // Update product stock (important!)
+        // Update product stock
         for (const item of itemsWithDetails) {
             const product = await Product.findById(item.product_id).session(session);
-
             if (product.productType === PRODUCT_TYPES.SIMPLE) {
                 product.simpleProduct.sp_totalStock -= item.quantity;
                 if (product.simpleProduct.sp_totalStock <= 0) {
@@ -655,35 +1005,128 @@ const createOrderItem = async (req, res) => {
                     }
                 }
             }
-
             await product.save({ session });
         }
 
         await session.commitTransaction();
 
-        // Create ShipRocket shipment for prepaid orders
-        if (shipping_method === 'shiprocket' && payment_method !== PaymentMethod.COD) {
+        console.log('Order saved successfully:', {
+            orderId: order._id,
+            orderNumber: order.order_number,
+            paymentMethod: payment_method,
+            totalAmount: total,
+            mobile: paymentMobile
+        });
+
+        // **TEZ PAYMENT INTEGRATION**
+        let paymentResponse = null;
+        if (isTezPayment) {
+            try {
+                console.log('Initiating Tez payment for order:', {
+                    orderId: order._id,
+                    orderNumber: order.order_number,
+                    amount: total,
+                    mobile: paymentMobile
+                });
+                
+                // Use order_number as order_id for Tez
+                const tezOrderId = order.order_number || `ORD_${order._id}`;
+                
+                paymentResponse = await tezGateway.createPaymentOrder({
+                    customerMobile: paymentMobile,
+                    amount: total.toString(),
+                    orderId: tezOrderId,
+                    remark1: `Order: ${order.order_number}`.substring(0, 50),
+                    remark2: `Customer: ${user.name || user.email}`.substring(0, 50)
+                });
+
+                console.log('Tez payment initiated successfully:', {
+                    orderId: order._id,
+                    paymentUrl: paymentResponse.paymentUrl,
+                    transactionId: paymentResponse.transactionId,
+                    message: paymentResponse.message
+                });
+
+                // Update order with payment details
+                await Order.findByIdAndUpdate(order._id, {
+                    'payment.transaction_id': paymentResponse.transactionId,
+                    'payment.payment_url': paymentResponse.paymentUrl,
+                    'payment.gateway_response': paymentResponse.paymentData,
+                    'payment.remark1': paymentResponse.paymentData.remark1,
+                    'payment.remark2': paymentResponse.paymentData.remark2
+                });
+
+            } catch (paymentError) {
+                console.error('Failed to create Tez payment:', {
+                    error: paymentError.message,
+                    orderId: order._id,
+                    mobile: paymentMobile
+                });
+                
+                // Update order to reflect payment failure
+                await Order.findByIdAndUpdate(order._id, {
+                    'payment.status': 'failed',
+                    'payment.failure_reason': paymentError.message
+                });
+
+                // Rollback stock for Tez payment failure
+                await mongoose.startSession().then(async (rollbackSession) => {
+                    rollbackSession.startTransaction();
+                    try {
+                        for (const item of itemsWithDetails) {
+                            const product = await Product.findById(item.product_id).session(rollbackSession);
+                            if (product.productType === PRODUCT_TYPES.SIMPLE) {
+                                product.simpleProduct.sp_totalStock += item.quantity;
+                                product.simpleProduct.sp_stockStatus = STOCK_STATUS.IN_STOCK;
+                            } else if (product.productType === PRODUCT_TYPES.VARIABLE) {
+                                const variant = product.variants.id(item.product_variant_id);
+                                if (variant) {
+                                    variant.variant_totalStock += item.quantity;
+                                    variant.variant_stockStatus = STOCK_STATUS.IN_STOCK;
+                                }
+                            }
+                            await product.save({ session: rollbackSession });
+                        }
+                        await rollbackSession.commitTransaction();
+                    } catch (rollbackError) {
+                        console.error('Failed to rollback stock:', rollbackError);
+                        await rollbackSession.abortTransaction();
+                    } finally {
+                        rollbackSession.endSession();
+                    }
+                });
+
+                return res.status(400).json({
+                    success: false,
+                    message: 'Payment initialization failed',
+                    error: paymentError.message,
+                    order_id: order._id,
+                    order_number: order.order_number,
+                    requires_payment_retry: true
+                });
+            }
+        }
+
+        // Create ShipRocket shipment for non-Tez prepaid orders
+        if (shipping_method === 'shiprocket' && payment_method !== PaymentMethod.COD && !isTezPayment) {
             setTimeout(async () => {
                 try {
                     await createShipRocketShipmentInBackground(order._id, user, userAddress, itemsWithDetails);
                 } catch (error) {
                     console.error('Failed to create ShipRocket shipment:', error);
                 }
-            }, 1000); // Delay to ensure order is saved
+            }, 1000);
         }
 
-        // Send email in background (non-blocking)
+        // Send email
         setTimeout(() => {
-            sendOrderEmailInBackground(
-                order,
-                user,
-                itemsWithDetails
-            );
+            sendOrderEmailInBackground(order, user, itemsWithDetails);
         }, 0);
 
-        res.status(201).json({
+        // Prepare response
+        const responseData = {
             success: true,
-            message: 'Order created successfully',
+            message: isTezPayment ? 'Order created. Please complete Tez payment.' : 'Order created successfully',
             data: {
                 order_id: order._id,
                 order_number: order.order_number,
@@ -694,7 +1137,21 @@ const createOrderItem = async (req, res) => {
                 total: total,
                 email_sent: true
             }
-        });
+        };
+
+        // Add Tez payment details if applicable
+        if (isTezPayment && paymentResponse) {
+            responseData.data.payment = {
+                method: 'tez',
+                status: 'pending',
+                payment_url: paymentResponse.paymentUrl,
+                transaction_id: paymentResponse.transactionId,
+                redirect_required: true,
+                message: paymentResponse.message
+            };
+        }
+
+        res.status(201).json(responseData);
 
     } catch (error) {
         console.error("Order creation error:", error);
@@ -708,6 +1165,8 @@ const createOrderItem = async (req, res) => {
         session.endSession();
     }
 };
+
+
 
 // 2. BULK CREATE - Create multiple order items (for order creation)
 const bulkCreateOrderItems = async (req, res) => {

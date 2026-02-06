@@ -15,7 +15,8 @@ const PaymentMethod = {
     BANK_TRANSFER: 'bank_transfer',
     RAZORPAY: 'Razorpay',
     STRIPE: 'Stripe',
-    UPI : 'upi'
+    UPI : 'upi',
+    TEZ : 'Tez'
 }
 
 const PaymentStatus = {
