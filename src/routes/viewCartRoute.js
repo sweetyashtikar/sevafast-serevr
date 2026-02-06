@@ -16,7 +16,7 @@ router.get('/summary', cartController.getCartSummary);
 router.get('/count', cartController.getCartCount);
 
 // Add item to cart
-router.post('/add', cartController.addToCart);
+router.post('/addtoCart', cartController.addToCart);
 
 // Update cart item quantity
 router.put('/item/:itemId', cartController.updateCartItem);

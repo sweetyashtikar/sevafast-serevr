@@ -23,7 +23,6 @@ const getCart = async (req, res) => {
                     select: 'name email businessName'
                 }
             })
-            .lean();
 
         if (!cart) {
             return res.status(200).json({
@@ -111,6 +110,17 @@ const getCart = async (req, res) => {
                 },
                 variant: variant ? {
                     _id: variant._id,
+                      variant_price: variant.variant_price,
+                    variant_specialPrice: variant.variant_specialPrice,
+                    variant_isActive: variant.variant_isActive,
+                    variant_stockStatus: variant.variant_stockStatus,
+                     variant_images: variant.variant_images || [],
+                      variant_dimensions: {
+                    variant_weight: variant.variant_weight,
+                    height: variant.variant_height,
+                    breadth: variant.variant_breadth,
+                    length: variant.variant_length
+                },
                     variant_name: variant.variant_name,
                     variant_sku: variant.variant_sku,
                     attributes: variant.variant_attributes
@@ -129,7 +139,7 @@ const getCart = async (req, res) => {
         const availableItems = processedItems.filter(item => item.available);
 
         // Calculate cart summary
-        const summary = this.calculateCartSummary(availableItems);
+        const summary = calculateCartSummary(availableItems);
 
         // Update cart if there are unavailable items
         if (availableItems.length !== cart.items.length) {
@@ -174,18 +184,18 @@ const addToCart = async (req, res) => {
 
     try {
         const userId = req.user._id;
-        const { productId, variantId, qty = 1 } = req.body;
+        const { productId, variantId, qty } = req.body;
 
         // Validate input
         if (!productId) {
             throw new Error('Product ID is required');
         }
 
-        if (qty < 1) {
+        if (!qty || qty < 1) {
             throw new Error('Quantity must be at least 1');
         }
 
-        // Get product with details
+        // Get product with minimal fields
         const product = await Product.findById(productId).session(session);
         if (!product) {
             throw new Error('Product not found');
@@ -197,8 +207,31 @@ const addToCart = async (req, res) => {
         }
 
         let price = 0;
-        let availableQty = 0;
+        let totalStock = 0;
         let variant = null;
+        let stockStatus = null;
+        let selectedVariantDetails = null;
+        let productDetails = null;
+
+        // Get existing cart
+        let cart = await Cart.findOne({ userId }).session(session);
+        if (!cart) {
+            cart = new Cart({
+                userId,
+                items: []
+            });
+        }
+
+        // Find existing item in cart
+        const existingItemIndex = cart.items.findIndex(item => {
+            if (product.productType === PRODUCT_TYPES.VARIABLE) {
+                return item.product.equals(productId) && 
+                       (item.variantId?.equals(variantId) || (!item.variantId && !variantId));
+            }
+            return item.product.equals(productId) && !item.variantId;
+        });
+
+        const existingCartQty = existingItemIndex > -1 ? cart.items[existingItemIndex].qty : 0;
 
         if (product.productType === PRODUCT_TYPES.VARIABLE) {
             if (!variantId) {
@@ -215,13 +248,38 @@ const addToCart = async (req, res) => {
             }
 
             price = variant.variant_specialPrice || variant.variant_price;
-            availableQty = variant.variant_totalStock;
+            totalStock = variant.variant_totalStock;
+            stockStatus = variant.variant_stockStatus;
 
-            if (availableQty < qty) {
-                throw new Error(`Only ${availableQty} items available for this variant`);
-            }
-        }
-        else if (product.productType === PRODUCT_TYPES.SIMPLE) {
+            // Extract only the needed variant details
+            selectedVariantDetails = {
+                _id: variant._id,
+                variant_price: variant.variant_price,
+                variant_specialPrice: variant.variant_specialPrice,
+                variant_isActive: variant.variant_isActive,
+                variant_stockStatus: variant.variant_stockStatus,
+                variant_sku: variant.variant_sku,
+                variant_name: variant.variant_name,
+                variant_attributes: variant.variant_attributes,
+                variant_images: variant.variant_images || [],
+                variant_dimensions: {
+                    variant_weight: variant.variant_weight,
+                    height: variant.variant_height,
+                    breadth: variant.variant_breadth,
+                    length: variant.variant_length
+                }
+            };
+
+            // Basic product info
+            productDetails = {
+                _id: product._id,
+                name: product.name,
+                productType: product.productType,
+                mainImage: product.images?.[0] || null,
+                vendorId: product.vendorId
+            };
+
+        } else if (product.productType === PRODUCT_TYPES.SIMPLE) {
             if (variantId) {
                 throw new Error('Variant ID should not be provided for simple product');
             }
@@ -231,81 +289,125 @@ const addToCart = async (req, res) => {
             }
 
             price = product.simpleProduct.sp_specialPrice || product.simpleProduct.sp_price;
-            availableQty = product.simpleProduct.sp_totalStock;
+            totalStock = product.simpleProduct.sp_totalStock;
+            stockStatus = product.simpleProduct.sp_stockStatus;
 
-            if (availableQty < qty) {
-                throw new Error(`Only ${availableQty} items available`);
-            }
-        }
-        else {
+            // Simple product details
+            productDetails = {
+                _id: product._id,
+                name: product.name,
+                productType: product.productType,
+                images: product.images || [],
+                description: product.description,
+                vendorId: product.vendorId,
+                simpleProduct: {
+                    sp_sku: product.simpleProduct.sp_sku,
+                    sp_price: product.simpleProduct.sp_price,
+                    sp_specialPrice: product.simpleProduct.sp_specialPrice,
+                    sp_stockStatus: product.simpleProduct.sp_stockStatus,
+                    sp_weight: product.simpleProduct.sp_weight,
+                    sp_dimensions: {
+                        height: product.simpleProduct.sp_height,
+                        breadth: product.simpleProduct.sp_breadth,
+                        length: product.simpleProduct.sp_length
+                    }
+                }
+            };
+        } else {
             throw new Error('Invalid product type');
         }
 
-        // Find existing cart or create new
-        let cart = await Cart.findOne({ userId }).session(session);
+        // Calculate new total quantity
+        const newQty = existingCartQty + parseInt(qty);
 
-        if (!cart) {
-            cart = new Cart({
-                userId,
-                items: []
-            });
+        // Validate stock availability considering already reserved quantity
+        if (newQty > totalStock) {
+            const availableForAdd = totalStock - existingCartQty;
+            throw new Error(
+                availableForAdd > 0 
+                    ? `Only ${availableForAdd} more items available. You already have ${existingCartQty} in cart.`
+                    : 'Product is out of stock'
+            );
         }
 
-        // Check if item already exists in cart
-        const existingItemIndex = cart.items.findIndex(item => {
-            if (product.productType === PRODUCT_TYPES.VARIABLE) {
-                return item.product.equals(productId) && item.variantId?.equals(variantId);
-            }
-            return item.product.equals(productId) && !item.variantId;
-        });
-
+        // Update or add item to cart
         if (existingItemIndex > -1) {
-            // Update existing item quantity
-            const newQty = cart.items[existingItemIndex].qty + qty;
-
-            if (newQty > availableQty) {
-                throw new Error(`Cannot add ${qty} more items. Only ${availableQty - cart.items[existingItemIndex].qty} available.`);
-            }
-
             cart.items[existingItemIndex].qty = newQty;
+            if (variantId && !cart.items[existingItemIndex].variantId) {
+                cart.items[existingItemIndex].variantId = variantId;
+            }
         } else {
-            // Add new item
             const newItem = {
                 product: productId,
-                qty: qty
+                qty: parseInt(qty)
             };
-
-            if (variantId) {
-                newItem.variantId = variantId;
-            }
-
+            if (variantId) newItem.variantId = variantId;
             cart.items.push(newItem);
         }
 
         await cart.save({ session });
         await session.commitTransaction();
 
-        // Get updated cart with populated data
+        // Get cart summary (without heavy population)
         const updatedCart = await Cart.findOne({ userId })
             .populate({
                 path: 'items.product',
-                select: 'name images productType'
-            });
+                select: 'name productType images'
+            })
+            .lean();
 
-        res.status(200).json({
+        // Process cart items for response
+        const cartItems = updatedCart.items.map(item => {
+            const itemResponse = {
+                _id: item._id,
+                productId: item.product._id,
+                productName: item.product.name,
+                productType: item.product.productType,
+                productImage: item.product.images?.[0] || null,
+                qty: item.qty,
+                variantId: item.variantId || null
+            };
+
+            // Add price and total if it's the item we just updated
+            if (item.product._id.toString() === productId.toString() && 
+                (!variantId || (item.variantId && item.variantId.toString() === variantId.toString()))) {
+                itemResponse.price = price;
+                itemResponse.itemTotal = price * item.qty;
+            }
+
+            return itemResponse;
+        });
+
+        const finalQty = existingItemIndex > -1 ? cart.items[existingItemIndex].qty : parseInt(qty);
+        const itemTotal = price * finalQty;
+
+        // Build clean response
+        const response = {
             success: true,
             message: existingItemIndex > -1 ? 'Cart item updated' : 'Item added to cart',
             data: {
-                cart: updatedCart,
+                action: existingItemIndex > -1 ? 'updated' : 'added',
                 item: {
-                    productId,
-                    variantId,
-                    qty: existingItemIndex > -1 ? cart.items[existingItemIndex].qty : qty,
+                    product: productDetails,
+                    variant: selectedVariantDetails,
+                    qty: finalQty,
                     price,
-                    itemTotal: price * (existingItemIndex > -1 ? cart.items[existingItemIndex].qty : qty)
+                    itemTotal,
+                    stockInfo: {
+                        totalStock,
+                        available: totalStock - finalQty,
+                        status: stockStatus
+                    }
+                },
+                cartSummary: {
+                    totalItems: cartItems.reduce((sum, item) => sum + item.qty, 0),
+                    itemCount: cartItems.length,
+                    totalAmount: cartItems.reduce((sum, item) => sum + (item.itemTotal || 0), 0)
                 }
             }
-        });
+        };
+
+        res.status(200).json(response);
 
     } catch (error) {
         console.error('Add to cart error:', error);
@@ -318,8 +420,7 @@ const addToCart = async (req, res) => {
     } finally {
         session.endSession();
     }
-}
-
+};
 /**
  * Update cart item quantity
  */

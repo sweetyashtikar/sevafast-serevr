@@ -9,8 +9,8 @@ const { PaymentMethod } = require('../models/orders');
 const { PRODUCT_TYPES, STOCK_STATUS } = require('../types/productTypes');
 const { emailService } = require('../utils/sendmail');
 const ShipRocketService = require('../services/shiprocket.service');
+const tezGateway = require('../services/tezPayment.service')
 
-const tezGateway = require('../services/texPayment')
 /**
  * ORDER ITEM CRUD CONTROLLER
  */
@@ -361,7 +361,7 @@ const tezGateway = require('../services/texPayment')
 //             discount,
 //             tax_amount,
 //             delivery_info,
-//             shipping_method = 'standard' // Add shipping method option
+//             shipping_method = 'standard'
 //         } = req.body;
 
 //         const user_id = req.user._id;
@@ -369,10 +369,10 @@ const tezGateway = require('../services/texPayment')
 //         // Validate User and Address IDs
 //         await checkId(User, user_id);
 
-//         // Fetch user details for email
+//         // Fetch user details
 //         const user = await User.findById(user_id).select('name email phone username');
 
-//         // Fetch address with populated area and city
+//         // Fetch address
 //         const userAddress = await Address.findById(address_id)
 //             .populate({
 //                 path: 'area_id',
@@ -380,18 +380,18 @@ const tezGateway = require('../services/texPayment')
 //             })
 //             .populate({
 //                 path: 'city_id',
-//                 select: 'name active pincode' // Added pincode here
+//                 select: 'name active pincode'
 //             });
 
 //         if (!userAddress) {
 //             throw new Error('Address not found');
 //         }
 
-//         // Get delivery charge from area and convert to number
+//         // Get delivery charge
 //         const areaDeliveryCharge = parseFloat(userAddress.area_id.delivery_charges) || 0;
 //         const minimumFreeDeliveryAmount = parseFloat(userAddress.area_id.minimum_free_delivery_order_amount) || 0;
 
-//         // Check ShipRocket serviceability if shipping_method is 'shiprocket'
+//         // ShipRocket serviceability check
 //         let shiprocketServiceability = null;
 //         let shiprocketDeliveryCharge = areaDeliveryCharge;
 //         let totalWeight = 0;
@@ -403,35 +403,25 @@ const tezGateway = require('../services/texPayment')
 //                     throw new Error('Pincode not found for address');
 //                 }
                 
-//                 // Calculate total weight of items
 //                 totalWeight = items.reduce((sum, item) => {
-//                     // You might want to fetch actual product weight from database
-//                     return sum + (item.quantity * 0.5); // Assuming 0.5kg per item
+//                     return sum + (item.quantity * 0.5);
 //                 }, 0);
                 
-//                 // Check serviceability
 //                 shiprocketServiceability = await ShipRocketService.checkServiceability(
 //                     pincode,
 //                     totalWeight || 0.5,
-//                     15, // length in cm
-//                     15, // breadth in cm
-//                     15  // height in cm
+//                     15, 15, 15
 //                 );
                 
-//                 if (shiprocketServiceability && shiprocketServiceability.data.available) {
-//                     // Use ShipRocket's freight charge if available
+//                 if (shiprocketServiceability?.data?.available) {
 //                     shiprocketDeliveryCharge = parseFloat(shiprocketServiceability.data.freight_charge) || areaDeliveryCharge;
-//                 } else {
-//                     // If ShipRocket not available, fall back to standard
-//                     console.warn('ShipRocket not available, falling back to standard shipping');
 //                 }
 //             } catch (shiprocketError) {
 //                 console.warn('ShipRocket serviceability check failed:', shiprocketError.message);
-//                 // Continue with default charges if ShipRocket fails
 //             }
 //         }
 
-//         // Group items by product to efficiently validate variants
+//         // Validate products and stock
 //         const productVariantMap = {};
 //         items.forEach(item => {
 //             if (!productVariantMap[item.product_id]) {
@@ -443,25 +433,15 @@ const tezGateway = require('../services/texPayment')
 //             });
 //         });
 
-//         // Validate all product variants exist and have sufficient stock
 //         for (const [productId, variants] of Object.entries(productVariantMap)) {
 //             const product = await Product.findById(productId);
-
-//             if (!product) {
-//                 throw new Error(`Product ${productId} not found`);
-//             }
-
-//             // Check if product is active and approved
+//             if (!product) throw new Error(`Product ${productId} not found`);
 //             if (!product.status || !product.isApproved || product.isDeleted) {
 //                 throw new Error(`Product ${productId} is not available`);
 //             }
 
-//             // FIXED: Changed items.product_variant_id to item.product_variant_id
-//             // For each variant in this product
 //             for (const variantInfo of variants) {
-//                 // For simple products without variants
 //                 if (!variantInfo.variantId && product.productType === PRODUCT_TYPES.SIMPLE) {
-//                     // Check stock availability for simple product
 //                     if (product.simpleProduct.sp_stockStatus !== STOCK_STATUS.IN_STOCK ||
 //                         product.simpleProduct.sp_totalStock < variantInfo.quantity) {
 //                         throw new Error(`Insufficient stock for product ${product.name}`);
@@ -469,18 +449,10 @@ const tezGateway = require('../services/texPayment')
 //                     continue;
 //                 }
                 
-//                 // For variable products with variants
 //                 const variant = product.variants.id(variantInfo.variantId);
-
-//                 if (!variant) {
-//                     throw new Error(`Variant ${variantInfo.variantId} not found in product ${productId}`);
-//                 }
-
-//                 if (!variant.variant_isActive) {
-//                     throw new Error(`Variant ${variantInfo.variantId} is not active`);
-//                 }
-
-//                 // Check stock availability
+//                 if (!variant) throw new Error(`Variant ${variantInfo.variantId} not found`);
+//                 if (!variant.variant_isActive) throw new Error(`Variant ${variantInfo.variantId} is not active`);
+                
 //                 if (product.productType === PRODUCT_TYPES.VARIABLE) {
 //                     if (variant.variant_stockStatus !== STOCK_STATUS.IN_STOCK ||
 //                         variant.variant_totalStock < variantInfo.quantity) {
@@ -490,53 +462,31 @@ const tezGateway = require('../services/texPayment')
 //             }
 //         }
 
-//         // Calculate sub_total for each item
+//         // Calculate item details
 //         const itemsWithDetails = await Promise.all(items.map(async (item) => {
 //             const product = await Product.findById(item.product_id);
-
 //             let variant = null;
-//             let price = undefined;
-
-//             // Check if price was explicitly provided in req.body
-//             const hasPriceInRequest = item.price !== undefined && item.price !== null;
-
-//             if (hasPriceInRequest) {
-//                 // Use price from req.body
-//                 price = parseFloat(item.price);
-//             }
+//             let price = item.price !== undefined ? parseFloat(item.price) : undefined;
             
 //             if (product.productType === PRODUCT_TYPES.VARIABLE) {
 //                 if (item.product_variant_id) {
 //                     variant = product.variants.id(item.product_variant_id);
-//                     if (!variant) {
-//                         throw new Error(`Variant ${item.product_variant_id} not found`);
-//                     }
-
-//                     // If price wasn't provided in request, get from variant
-//                     if (!hasPriceInRequest) {
-//                         // Use special price if available, otherwise regular price
+//                     if (!variant) throw new Error(`Variant ${item.product_variant_id} not found`);
+//                     if (price === undefined) {
 //                         price = parseFloat(variant.variant_specialPrice || variant.variant_price);
 //                     }
 //                 } else {
 //                     throw new Error(`Variant ID required for variable product ${product.name}`);
 //                 }
-//             } else if (product.productType === PRODUCT_TYPES.SIMPLE) {
-//                 // If price wasn't provided in request, get from simple product
-//                 if (!hasPriceInRequest) {
-//                     // Use special price if available, otherwise regular price
-//                     price = parseFloat(product.simpleProduct.sp_specialPrice || product.simpleProduct.sp_price || product.simpleProduct.price);
-//                 }
+//             } else if (product.productType === PRODUCT_TYPES.SIMPLE && price === undefined) {
+//                 price = parseFloat(product.simpleProduct.sp_specialPrice || product.simpleProduct.sp_price || product.simpleProduct.price);
 //             }
 
-//             // Final validation
-//             if (price === undefined || price === null || isNaN(price) || price <= 0) {
-//                 throw new Error(`Invalid price for product ${product.name}. Price: ${price}`);
+//             if (!price || price <= 0 || isNaN(price)) {
+//                 throw new Error(`Invalid price for product ${product.name}`);
 //             }
 
 //             const sub_total = price * item.quantity;
-//             const vendorId = product.vendorId;
-
-//             // Create better variant name
 //             let variantName = product.name;
 //             if (variant) {
 //                 variantName = `${product.name} - ${variant.variant_sku || 'Variant'}`;
@@ -548,58 +498,47 @@ const tezGateway = require('../services/texPayment')
 //                 sub_total,
 //                 product_name: product.name,
 //                 variant_name: variantName,
-//                 vendorId: vendorId,
+//                 vendorId: product.vendorId,
 //             };
 //         }));
         
 //         const itemsTotal = itemsWithDetails.reduce((sum, item) => sum + item.sub_total, 0);
 //         const promoDiscount = parseFloat(promo_details?.discount) || 0;
 
-//         // Determine final delivery charge based on shipping method
-//         let finalDeliveryCharge;
-//         if (shipping_method === 'shiprocket') {
-//             finalDeliveryCharge = shiprocketDeliveryCharge;
-//         } else {
-//             finalDeliveryCharge = areaDeliveryCharge;
-//         }
-        
-//         // Apply free delivery if order meets minimum
+//         // Calculate delivery charge
+//         let finalDeliveryCharge = shipping_method === 'shiprocket' ? shiprocketDeliveryCharge : areaDeliveryCharge;
 //         if (minimumFreeDeliveryAmount > 0 && itemsTotal >= minimumFreeDeliveryAmount) {
 //             finalDeliveryCharge = 0;
 //         }
 
-//         // Calculate totals
-//         const total = itemsTotal +
-//             finalDeliveryCharge -
-//             (parseFloat(discount) || 0) -
-//             promoDiscount +
-//             (parseFloat(tax_amount) || 0);
+//         // Calculate total
+//         const total = itemsTotal + finalDeliveryCharge - (parseFloat(discount) || 0) - promoDiscount + (parseFloat(tax_amount) || 0);
 
 //         // Check if payment method is Tez
 //         const isTezPayment = payment_method === PaymentMethod.TEZ || payment_method === 'tez';
 
 //         // **VALIDATE MOBILE FOR TEZ PAYMENT**
 //         let paymentMobile = mobile || user.phone || userAddress.mobile;
-
-//          if (isTezPayment) {
+        
+//         if (isTezPayment) {
 //             // Ensure we have a mobile number for Tez payment
 //             if (!paymentMobile) {
 //                 throw new Error('Mobile number is required for Tez payment');
 //             }
             
 //             // Validate mobile format for Tez
-//             const formattedMobile = TezGatewayCreateOrderAPI.formatMobileNumber(paymentMobile);
+//             const formattedMobile = tezGateway.formatMobileNumber(paymentMobile);
 //             if (!tezGateway.validateMobileNumber(formattedMobile)) {
 //                 throw new Error(`Invalid mobile number for Tez payment: ${paymentMobile}. Please provide a valid 10-digit Indian mobile number.`);
 //             }
 //             paymentMobile = formattedMobile; // Use formatted mobile
 //         }
 
-//         // Create Order with shipping method and ShipRocket data
+//         // Create Order
 //         const order = new Order({
 //             user_id,
 //             address_id,
-//             mobile,
+//             mobile: paymentMobile, // Use validated/formatted mobile
 //             address: address || userAddress.address,
 //             location: location || userAddress.location,
 //             total: itemsTotal,
@@ -660,10 +599,9 @@ const tezGateway = require('../services/texPayment')
 
 //         await OrderItem.insertMany(orderItems, { session });
 
-//         // Update product stock (important!)
+//         // Update product stock
 //         for (const item of itemsWithDetails) {
 //             const product = await Product.findById(item.product_id).session(session);
-
 //             if (product.productType === PRODUCT_TYPES.SIMPLE) {
 //                 product.simpleProduct.sp_totalStock -= item.quantity;
 //                 if (product.simpleProduct.sp_totalStock <= 0) {
@@ -678,35 +616,128 @@ const tezGateway = require('../services/texPayment')
 //                     }
 //                 }
 //             }
-
 //             await product.save({ session });
 //         }
 
 //         await session.commitTransaction();
 
-//         // Create ShipRocket shipment for prepaid orders
-//         if (shipping_method === 'shiprocket' && payment_method !== PaymentMethod.COD) {
+//         console.log('Order saved successfully:', {
+//             orderId: order._id,
+//             orderNumber: order.order_number,
+//             paymentMethod: payment_method,
+//             totalAmount: total,
+//             mobile: paymentMobile
+//         });
+
+//         // **TEZ PAYMENT INTEGRATION**
+//         let paymentResponse = null;
+//         if (isTezPayment) {
+//             try {
+//                 console.log('Initiating Tez payment for order:', {
+//                     orderId: order._id,
+//                     orderNumber: order.order_number,
+//                     amount: total,
+//                     mobile: paymentMobile
+//                 });
+                
+//                 // Use order_number as order_id for Tez
+//                 const tezOrderId = order.order_number || `ORD_${order._id}`;
+                
+//                 paymentResponse = await tezGateway.createPaymentOrder({
+//                     customerMobile: paymentMobile,
+//                     amount: total.toString(),
+//                     orderId: tezOrderId,
+//                     remark1: `Order: ${order.order_number}`.substring(0, 50),
+//                     remark2: `Customer: ${user.name || user.email}`.substring(0, 50)
+//                 });
+
+//                 console.log('Tez payment initiated successfully:', {
+//                     orderId: order._id,
+//                     paymentUrl: paymentResponse.paymentUrl,
+//                     transactionId: paymentResponse.transactionId,
+//                     message: paymentResponse.message
+//                 });
+
+//                 // Update order with payment details
+//                 await Order.findByIdAndUpdate(order._id, {
+//                     'payment.transaction_id': paymentResponse.transactionId,
+//                     'payment.payment_url': paymentResponse.paymentUrl,
+//                     'payment.gateway_response': paymentResponse.paymentData,
+//                     'payment.remark1': paymentResponse.paymentData.remark1,
+//                     'payment.remark2': paymentResponse.paymentData.remark2
+//                 });
+
+//             } catch (paymentError) {
+//                 console.error('Failed to create Tez payment:', {
+//                     error: paymentError.message,
+//                     orderId: order._id,
+//                     mobile: paymentMobile
+//                 });
+                
+//                 // Update order to reflect payment failure
+//                 await Order.findByIdAndUpdate(order._id, {
+//                     'payment.status': 'failed',
+//                     'payment.failure_reason': paymentError.message
+//                 });
+
+//                 // Rollback stock for Tez payment failure
+//                 await mongoose.startSession().then(async (rollbackSession) => {
+//                     rollbackSession.startTransaction();
+//                     try {
+//                         for (const item of itemsWithDetails) {
+//                             const product = await Product.findById(item.product_id).session(rollbackSession);
+//                             if (product.productType === PRODUCT_TYPES.SIMPLE) {
+//                                 product.simpleProduct.sp_totalStock += item.quantity;
+//                                 product.simpleProduct.sp_stockStatus = STOCK_STATUS.IN_STOCK;
+//                             } else if (product.productType === PRODUCT_TYPES.VARIABLE) {
+//                                 const variant = product.variants.id(item.product_variant_id);
+//                                 if (variant) {
+//                                     variant.variant_totalStock += item.quantity;
+//                                     variant.variant_stockStatus = STOCK_STATUS.IN_STOCK;
+//                                 }
+//                             }
+//                             await product.save({ session: rollbackSession });
+//                         }
+//                         await rollbackSession.commitTransaction();
+//                     } catch (rollbackError) {
+//                         console.error('Failed to rollback stock:', rollbackError);
+//                         await rollbackSession.abortTransaction();
+//                     } finally {
+//                         rollbackSession.endSession();
+//                     }
+//                 });
+
+//                 return res.status(400).json({
+//                     success: false,
+//                     message: 'Payment initialization failed',
+//                     error: paymentError.message,
+//                     order_id: order._id,
+//                     order_number: order.order_number,
+//                     requires_payment_retry: true
+//                 });
+//             }
+//         }
+
+//         // Create ShipRocket shipment for non-Tez prepaid orders
+//         if (shipping_method === 'shiprocket' && payment_method !== PaymentMethod.COD && !isTezPayment) {
 //             setTimeout(async () => {
 //                 try {
 //                     await createShipRocketShipmentInBackground(order._id, user, userAddress, itemsWithDetails);
 //                 } catch (error) {
 //                     console.error('Failed to create ShipRocket shipment:', error);
 //                 }
-//             }, 1000); // Delay to ensure order is saved
+//             }, 1000);
 //         }
 
-//         // Send email in background (non-blocking)
+//         // Send email
 //         setTimeout(() => {
-//             sendOrderEmailInBackground(
-//                 order,
-//                 user,
-//                 itemsWithDetails
-//             );
+//             sendOrderEmailInBackground(order, user, itemsWithDetails);
 //         }, 0);
 
-//         res.status(201).json({
+//         // Prepare response
+//         const responseData = {
 //             success: true,
-//             message: 'Order created successfully',
+//             message: isTezPayment ? 'Order created. Please complete Tez payment.' : 'Order created successfully',
 //             data: {
 //                 order_id: order._id,
 //                 order_number: order.order_number,
@@ -717,7 +748,21 @@ const tezGateway = require('../services/texPayment')
 //                 total: total,
 //                 email_sent: true
 //             }
-//         });
+//         };
+
+//         // Add Tez payment details if applicable
+//         if (isTezPayment && paymentResponse) {
+//             responseData.data.payment = {
+//                 method: 'tez',
+//                 status: 'pending',
+//                 payment_url: paymentResponse.paymentUrl,
+//                 transaction_id: paymentResponse.transactionId,
+//                 redirect_required: true,
+//                 message: paymentResponse.message
+//             };
+//         }
+
+//         res.status(201).json(responseData);
 
 //     } catch (error) {
 //         console.error("Order creation error:", error);
@@ -731,7 +776,6 @@ const tezGateway = require('../services/texPayment')
 //         session.endSession();
 //     }
 // };
-
 
 //with payment gateway
 const createOrderItem = async (req, res) => {
