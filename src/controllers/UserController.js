@@ -49,7 +49,7 @@ const RegisterUser = async (req, res) => {
             zipcodes : zipcodes || [],
         };
         if (findRole.role === "customer") {
-            userData.active = true;
+            userData.status = true;
         }
 
         // 5. Handle Geo-Location (GeoJSON format)
@@ -127,10 +127,43 @@ const deleteUser = async (req, res) => {
     }
 };
 
+const getMyProfile = async (req, res) => {
+  try {
+    // Get user ID from authentication middleware (assuming you have auth middleware)
+    const userId = req.user.id;
+    
+    // Find user by ID, populate role, exclude sensitive fields
+    const user = await User.findById(userId)
+      .select('-password -apikey -security') // Exclude sensitive data
+      .populate('role', 'role'); // Populate role details
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      message: 'Profile retrieved successfully',
+      data: user
+    });
+  } catch (error) {
+    console.error('Get profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching profile',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
     RegisterUser,
     getAllUsers,
     updateUser,
     deleteUser,
-    getAllVendors
+    getAllVendors,
+    getMyProfile
 };

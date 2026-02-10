@@ -3,6 +3,8 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 const { MONGODB_URI } = require('./src/env-variables');
 const cookieParser = require('cookie-parser');
+const dns = require("dns");
+dns.setServers(["1.1.1.1", "8.8.8.8"]);
 
 const { authenticate,authorizePermission} = require('./src/middleware/authMiddleware')
 
