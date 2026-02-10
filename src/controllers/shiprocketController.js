@@ -1,5 +1,14 @@
 const Area = require('../models/area')
 const Zipcode = require('../models/zipcode')
+const ShipRocketService = require('../services/shiprocket.service');
+const Order = require('../models/orders');
+const User = require('../models/User');
+const Address = require('../models/address');
+const OrderItem = require('../models/orderItem');
+const axios = require('axios');
+
+// Check shipping serviceability
+
 
 
 const checkShippingServiceability = async (req, res) => {
@@ -13,7 +22,7 @@ const checkShippingServiceability = async (req, res) => {
 
         if (shipping_method === 'shiprocket') {
             //check ship rocket serviceability
-            serviceability = await shipRocketService.checkServiceability(
+            serviceability = await ShipRocketService.checkServiceability(
                 pincode,
                 parseFloat(weight),
                 15, //length

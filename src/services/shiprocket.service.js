@@ -1,5 +1,11 @@
 // services/shiprocket.service.js
 const axios = require('axios');
+const dotenv = require('dotenv');
+
+dotenv.config();
+
+console.log("shiprocket email:", process.env.SHIPROCKET_EMAIL);
+console.log("shiprocket password:", process.env.SHIPROCKET_PASSWORD);
 
 class ShipRocketService {
   constructor() {
