@@ -17,7 +17,7 @@ const getCart = async (req, res) => {
         const cart = await Cart.findOne({ userId })
             .populate({
                 path: 'items.product',
-                select: 'name price productType status isApproved isDeleted images variants simpleProduct vendorId',
+                select: 'name price productType status isApproved isDeleted mainImage otherImages variants simpleProduct vendorId',
                 populate: {
                     path: 'vendorId',
                     select: 'name email businessName'
@@ -104,7 +104,7 @@ const getCart = async (req, res) => {
                 product: {
                     _id: product._id,
                     name: product.name,
-                    images: product.images,
+                    mainImages: product.mainImage,
                     productType: product.productType,
                     vendor: product.vendorId
                 },

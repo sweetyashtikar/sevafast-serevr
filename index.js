@@ -37,6 +37,9 @@ const OrderItemRoute = require('./src/routes/orderItemRoute')
 // const paymentRoutes = require('./src/controllers/razorpaycontroller');
 const brandRoutes = require('./src/routes/brandRoute');
 const viewCartRoute = require('./src/routes/viewCartRoute')
+const userPermissionRoute = require('./src/routes/userPermissionRoute')
+const tezRoute = require('./src/routes/tezRoute')
+const DeliveryBoyRoute = require('./src/routes/deliveryBoyRoutes')
 
 
 
@@ -84,9 +87,11 @@ app.use('/api/faq', faqRoute)
 app.use('/api/favourite', favouriteRoute)
 app.use('/api/product-faqs', productFaqRoute);
 app.use('/api/order', OrderItemRoute)
-// app.use('/api/payments', paymentRoutes);
+app.use('/api/payments', tezRoute);
 app.use('/api/brands', brandRoutes);
 app.use('/api/viewCart', viewCartRoute)
+app.use('/api/userPermission',userPermissionRoute )
+app.use('/api/delivery_boy',DeliveryBoyRoute)
 
 
 

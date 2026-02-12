@@ -611,9 +611,6 @@ const getAllProductsWithFilters = async (req, res) => {
     // Pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    console.log(query)
-    console.log("Final Query being sent to MongoDB:", JSON.stringify(query, null, 2));
-
     // Execute query
     const products = await Product.find(query)
       .populate("vendorId", "username company")

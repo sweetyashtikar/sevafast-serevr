@@ -7,14 +7,14 @@ const roleSchema = new mongoose.Schema({
         required: true,
         trim: true
     },
-    can_manage_products:{
-        type: Boolean,
-        default: false
-    },
-    can_manage_overall:{
-        type: Boolean,
-        default: false
-    }
+    // can_manage_products:{
+    //     type: Boolean,
+    //     default: false
+    // },
+    // can_manage_overall:{
+    //     type: Boolean,
+    //     default: false
+    // }
 }, { 
     timestamps: true 
 });

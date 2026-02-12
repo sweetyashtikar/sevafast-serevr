@@ -2,6 +2,7 @@ const express = require('express');
 const User = require('../models/User');
 const Roles = require('../models/roles');
 const bcrypt = require('bcryptjs');
+const {createDeliveryBoyProfile} = require('../controllers/deliveryBoy')
 
 // Create a new user
 const RegisterUser = async (req, res) => {    
@@ -9,7 +10,7 @@ const RegisterUser = async (req, res) => {
     try {
         const {  username, email, mobile, password, role, 
             latitude, longitude, address, city, pincode,
-            company, fcm_id , zipcodes } = req.body;
+            company, fcm_id , zipcodes, vendor_id } = req.body;
            const ip_address = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress || req.ip;
            console
 
@@ -27,6 +28,27 @@ const RegisterUser = async (req, res) => {
             const conflictField = findEmailOrMobile.email === email ? 'email' : 'mobile';
             return res.status(400).json({ success: false, message: `User with this ${conflictField} already exists` });
         }
+
+        if(role === 'delivery_boy' && !vendor_id){
+             return res.status(400).json({
+        success: false,
+        message: 'Vendor ID is required for creating a delivery boy'
+      });
+        }
+
+         // Check if vendor exists (only if role is delivery_boy)
+    if (role === 'delivery_boy') {
+      const vendor = await User.findOne({ 
+        _id: vendor_id, 
+      });
+      
+      if (!vendor) {
+        return res.status(404).json({
+          success: false,
+          message: 'Vendor not found'
+        });
+      }
+    }
 
         const findRole = await Roles.findOne({ role });
         if (!findRole) return res.status(400).json({ success: false ,message: 'Invalid role' });
@@ -48,7 +70,7 @@ const RegisterUser = async (req, res) => {
             },
             zipcodes : zipcodes || [],
         };
-        if (findRole.role === "customer") {
+        if (findRole.role === "customer" || findRole.role === "delivery_boy") {
             userData.status = true;
         }
 
@@ -62,6 +84,13 @@ const RegisterUser = async (req, res) => {
 
         const newUser = new User(userData);
         await newUser.save();
+
+        let delivery_boy_profile = null;
+         // If role is delivery_boy, create delivery boy profile
+    if (role === 'delivery_boy') {
+      delivery_boy_profile = await createDeliveryBoyProfile(newUser._id, vendor_id);
+    }
+
         res.status(201).json({
             success: true, 
             message: 'User created successfully', 

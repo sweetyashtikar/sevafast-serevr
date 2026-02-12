@@ -265,15 +265,15 @@ const getUserAddresses = async (req, res) => {
                         minimum_free_delivery: addr.area_id.minimum_free_delivery_order_amount
                     } : null
                 })),
-                summary: {
-                    total_addresses: total,
-                    returned_addresses: filteredAddresses.length,
-                    default_address: defaultAddress || null,
-                    address_types: addressTypes,
-                    serviceable_addresses: addresses.filter(addr => 
-                        addr.area_id && addr.area_id.active
-                    ).length
-                },
+                // summary: {
+                //     total_addresses: total,
+                //     returned_addresses: filteredAddresses.length,
+                //     default_address: defaultAddress || null,
+                //     address_types: addressTypes,
+                //     serviceable_addresses: addresses.filter(addr => 
+                //         addr.area_id && addr.area_id.active
+                //     ).length
+                // },
                 pagination: {
                     current_page: pageNum,
                     total_pages: Math.ceil(total / limitNum),

@@ -15,8 +15,9 @@ const userPermissionSchema = new mongoose.Schema({
     },
     // Numeric Role (e.g., 0 for Super Admin, 1 for Staff/Manager)
     role: {
-        type: Number,
-        default: 1
+         type: mongoose.Schema.Types.ObjectId,
+        ref: 'Role',
+        required: true,
     },
     /**
      * Permissions Object
@@ -26,18 +27,14 @@ const userPermissionSchema = new mongoose.Schema({
     permissions: {
         type: Map,
         of: {
-            create: { type: String, 
-                enum: [permission.ON, permission.OFF], 
-                default: permission.OFF },
-            read:   { type: String, 
-                enum: [permission.ON, permission.OFF], 
-                default: permission.OFF },
-            update: { type: String, 
-                enum: [permission.ON, permission.OFF], 
-                default: permission.OFF },
-            delete: { type: String,
-                 enum: [permission.ON, permission.OFF],
-                  default: permission.OFF }
+            create: { type: Boolean,  
+                default: false},
+            read:   { type: Boolean, 
+                 default: false},
+            update: { type: Boolean, 
+                default: false},
+            delete: { type: Boolean,
+                 default: false},
         }
     }
 }, { 

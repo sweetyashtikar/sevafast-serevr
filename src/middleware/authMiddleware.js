@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
-const User = require('../models/User'); 
-const Role = require('../models/roles'); 
+const User = require('../models/User');
+const Role = require('../models/roles');
+const PermissionChecker = require('../utils/permissionChecker')
 
 
 const authenticate = async (req, res, next) => {
@@ -19,7 +20,7 @@ const authenticate = async (req, res, next) => {
         // POPULATE role here so that checkIfAdmin has access to the role name
         const user = await User.findById(decoded.id)
             .select('-password')
-            .populate('role'); 
+            .populate('role');
 
         // 1. CHECK IF USER EXISTS FIRST
         if (!user) {
@@ -31,10 +32,35 @@ const authenticate = async (req, res, next) => {
             return res.status(403).json({ success: false, message: "Your account is inactive." });
         }
 
-        req.user = user; 
+        const userPermission = await PermissionChecker.getUserPermissions(user._id)
+
+        //attach user and permission to the request
+        req.user = {
+            ...user.toObject(),
+            permissions: userPermission.permissions
+        }
+
+        req.user = user;
         next();
     } catch (error) {
-        res.status(401).json({ success: false, message: "Invalid or expired token." });
+        console.error('Authentication error:', error);
+        if (error.name === 'JsonWebTokenError') {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid Token"
+            })
+        }
+        if (error.name === 'TokenExpiredError') {
+            return res.status(401).json({
+                success: false,
+                message: 'Token expired'
+            });
+        }
+        res.status(500).json({
+            success: false,
+            message: 'Authentication failed',
+            error: error.message
+        });
     }
 };
 
@@ -94,22 +120,74 @@ const authorizePermission = (permissionField) => {
     };
 }
 
-const checkIfAdmin  = async (req, res, next) => {
-        try {
-            if (!req.user) {
-                return res.status(401).json({ message: "Authentication required." });
-            }
-            const role = req.user.role?.role
-            if (role === 'admin') {
-                return next();
-            }
-
-            return res.status(403).json({ message: "You do not have permission to perform this action." });
-        } catch (error) {
-            console.log("hey error", error)
-            res.status(500).json({ message: "Authorization error", error: error.message });
+const checkIfAdmin = async (req, res, next) => {
+    try {
+        if (!req.user) {
+            return res.status(401).json({ message: "Authentication required." });
         }
+        const role = req.user.role?.role
+        if (role === 'admin') {
+            return next();
+        }
+
+        return res.status(403).json({ message: "You do not have permission to perform this action." });
+    } catch (error) {
+        console.log("hey error", error)
+        res.status(500).json({ message: "Authorization error", error: error.message });
+    }
+};
+
+/**
+ * Authorization middleware (simplified)
+ * Now uses PermissionChecker utility
+ */
+
+const authorize = (resource, action) => {
+    return PermissionChecker.requirePermission(resource.action);
+}
+
+/**
+ * Authorization middleware for any of multiple permissions
+ */
+const authorizeAny = (requiredPermission) => {
+    return PermissionChecker.requireAnyPermission(requiredPermissions);
+}
+/**
+ * Authorization middleware for all of multiple permissions
+ */
+const authorizeAll = (requiredPermissions) => {
+    return PermissionChecker.requireAllPermissions(requiredPermissions);
+};
+
+const authorizeRole = (...allowedRoles) => {
+    return async (req, res, next) => {
+        if (!req.user) {
+            return res.status(401).json({
+                success: false,
+                message: 'Authentication required'
+            });
+        }
+
+        const userRole = req.user.role?.name;
+
+        if (!userRole || !allowedRoles.includes(userRole)) {
+            return res.status(403).json({
+                success: false,
+                message: 'Insufficient role privileges'
+            });
+        }
+
+        next();
+    };
 };
 
 
-module.exports = { authenticate, optionalAuth, authorizePermission,checkIfAdmin };
+
+
+module.exports = {
+    authenticate, optionalAuth, authorizePermission, checkIfAdmin,
+    authorize,           // For single permission check
+    authorizeAny,        // For any of multiple permissions
+    authorizeAll,        // For all of multiple permissions
+    authorizeRole
+};

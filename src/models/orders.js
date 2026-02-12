@@ -16,7 +16,7 @@ const PaymentMethod = {
     RAZORPAY: 'Razorpay',
     STRIPE: 'Stripe',
     UPI : 'upi',
-    TEZ : 'Tez'
+    TEZ : 'tez'
 }
 
 const PaymentStatus = {
