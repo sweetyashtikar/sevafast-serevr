@@ -17,9 +17,6 @@ const deliveryBoySchema = new mongoose.Schema({
   
   // Personal Details
   personal_details: {
-    full_name: String,
-    email: String,
-    mobile: String,
     alternate_mobile: String,
     profile_image: String,
     date_of_birth: Date,
@@ -124,11 +121,7 @@ const deliveryBoySchema = new mongoose.Schema({
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Zipcode'
     }],
-    max_delivery_limit: { type: Number, default: 5 }, // max concurrent deliveries
-    current_deliveries: [{ 
-      type: mongoose.Schema.Types.ObjectId, 
-      ref: 'Order' 
-    }]
+    max_delivery_limit: { type: Number, default: 5 }, 
   },
   
   // Working Schedule
@@ -178,4 +171,14 @@ deliveryBoySchema.index({ vendor_id: 1, 'employment.is_active': 1 });
 deliveryBoySchema.index({ 'availability.current_location': '2dsphere' });
 deliveryBoySchema.index({ 'performance.avg_rating': -1 });
 
+deliveryBoySchema.methods.getCurrentDeliveries = async function() {
+  const Order = mongoose.model('Order');
+  
+  return await Order.find({
+    'delivery_info.boy_id': this.user_id,
+    status: { $in: ['assigned', 'picked_up', 'shipped'] }
+  }).select('order_number status delivery_info.delivered_at');
+};
+
 module.exports = mongoose.model('DeliveryBoy', deliveryBoySchema);
+

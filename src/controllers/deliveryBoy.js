@@ -15,10 +15,7 @@ const createDeliveryBoyProfile = async (userId, vendorId) => {
       
       // Initialize with empty/default values - vendor will fill later
       personal_details: {
-        full_name: null,
-        email: null,
-        mobile: null,
-        alternate_mobile: null,
+ alternate_mobile: null,
         profile_image: null,
         date_of_birth: null,
         gender: null,
@@ -61,7 +58,7 @@ const createDeliveryBoyProfile = async (userId, vendorId) => {
         salary_type: 'per_delivery', // Default
         salary_amount: 0,
         commission_per_delivery: 30, // Default
-        status: true // Active by default
+        status: false // Active by default
       },
       
       vehicle: {

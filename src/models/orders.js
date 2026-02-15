@@ -1,13 +1,16 @@
 const mongoose = require('mongoose');
 
-const OrderStatus  = {
-    RECEIVED: 'received',
+const OrderStatus = {
+    PLACED: 'Order placed',
     PROCESSED: 'processed',
+    ASSIGNED: 'assigned',     // Added - assigned to delivery boy
+    PICKED_UP: 'picked_up',   // Added - delivery boy picked up
     SHIPPED: 'shipped',
     DELIVERED: 'delivered',
     CANCELLED: 'cancelled',
     RETURNED: 'returned'
 };
+
 
 const PaymentMethod = {
     COD: 'COD',
@@ -103,7 +106,7 @@ const orderSchema = new mongoose.Schema({
     delivery_info: {
         boy_id: { 
             type: mongoose.Schema.Types.ObjectId, 
-            ref: 'User' 
+            ref: 'DeliveryBoy' 
         },
         assigned_at: { type: Date },
         picked_up_at: { type: Date },
@@ -148,7 +151,7 @@ const orderSchema = new mongoose.Schema({
     },
 
     status_timestamps: {
-        received: { type: Date },
+        placed: { type: Date },
         processed: { type: Date },
         shipped: { type: Date },
         delivered: { type: Date },

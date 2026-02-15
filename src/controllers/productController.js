@@ -470,11 +470,73 @@ const getProductById = async (req, res) => {
 //get all products irrespective of status and isApproved
 const getAllProducts = async (req, res) => {
   try {
+     const {
+      page = 1,
+      limit = 20,
+      category,
+      vendor,
+      search,
+      minPrice,
+      maxPrice,
+      brand,
+      indicator,
+      productType,
+      sortBy = "createdAt",
+      sortOrder = "desc",
+      inStock,
+      deliverableZipcodes,
+      status, isApproved
+    } = req.query;
+    console.log(req.query)
+
+    const query = {};
+    if(status){
+        query.status = status;
+    }
+      if(isApproved){
+        query.isApproved = isApproved;
+    }
+
+     // Category filter
+    if (category) {
+      query.categoryId = category;
+    }
+     // Vendor filter
+    if (vendor) {
+      query.vendorId = vendor;
+    }
+
+    // Search filter (text search)
+    if (search) {
+      query.$text = { $search: search };
+    }
+
+    // Brand filter
+    if (brand) {
+      query.brand = brand;
+    }
+
+    // Indicator filter (veg/non-veg)
+    if (indicator !== undefined) {
+      query.indicator = parseInt(indicator);
+    }
+
+     // Product type filter
+    if (productType) {
+      query.productType = productType;
+    }
+
+        const sort = {};
+    sort[sortBy] = sortOrder === "asc" ? 1 : -1;
+
+    // Pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
 
     console.log("req product", req.query)
 
     // Execute query
-    const products = await Product.find({})
+    const products = await Product.find(query)
       .populate("vendorId", "username company")
       .populate("categoryId", "name sub_category")
       .populate("taxId", "title percentage")
@@ -490,6 +552,11 @@ const getAllProducts = async (req, res) => {
           }
         })
       })
+      .sort(sort)
+      .skip(skip)
+      .limit(parseInt(limit));
+
+       const total = await Product.countDocuments(query);
 
     // console.log("products", products)
     console.log("products.length", products.length)
@@ -501,6 +568,12 @@ const getAllProducts = async (req, res) => {
       success: true,
       data: {
         products,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages: Math.ceil(total / parseInt(limit)),
+          totalProducts: total,
+          productsPerPage: parseInt(limit),
+        },
       },
     });
   } catch (error) {

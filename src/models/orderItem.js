@@ -28,11 +28,6 @@ const orderItemSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
-    delivery_boy_id: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      default: null,
-    },
     product_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Product",
@@ -60,19 +55,12 @@ const orderItemSchema = new mongoose.Schema(
     seller_commission_amount: { type: Number, default: 0 },
     is_credited: { type: Boolean, default: false }, // Has the seller been paid?
 
-    // Status Tracking
-    active_status: {
+     // Status Tracking 
+    status: {
       type: String,
-      enum: [
-        ActiveStatus.AWAITING,
-        ActiveStatus.RECEIVED,
-        ActiveStatus.PROCESSED,
-        ActiveStatus.SHIPPED,
-        ActiveStatus.DELIVERED,
-        ActiveStatus.CANCELLED,
-        ActiveStatus.RETURNED,
-      ],
+      enum: Object.values(ActiveStatus),
       default: ActiveStatus.AWAITING,
+      index: true
     },
 
     // Tracking the status history (JSON string in SQL -> Array of Objects in Mongo)
@@ -82,9 +70,6 @@ const orderItemSchema = new mongoose.Schema(
         timestamp: { type: Date, default: Date.now },
       },
     ],
-
-    otp: { type: Number, default: 0 },
-    deliver_by: { type: String },
     updated_by: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   },
   {
@@ -93,8 +78,7 @@ const orderItemSchema = new mongoose.Schema(
 );
 
 // Indexes for fast Seller/Delivery Boy dashboards
-orderItemSchema.index({ seller_id: 1, active_status: 1 });
-orderItemSchema.index({ delivery_boy_id: 1, active_status: 1 });
+orderItemSchema.index({ seller_id: 1, status: 1 });
 orderItemSchema.index({ order_id: 1 });
 
 module.exports = mongoose.model("OrderItem", orderItemSchema);

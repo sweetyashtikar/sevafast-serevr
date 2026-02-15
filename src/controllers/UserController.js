@@ -54,7 +54,7 @@ const RegisterUser = async (req, res) => {
         if (!findRole) return res.status(400).json({ success: false ,message: 'Invalid role' });
 
         const userData = {
-            username: username || email.split('@')[0], // Fallback if username not provided
+            username: username , // Fallback if username not provided
             email,
             mobile,
             password,

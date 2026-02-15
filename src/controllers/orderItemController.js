@@ -10,6 +10,7 @@ const { PRODUCT_TYPES, STOCK_STATUS } = require('../types/productTypes');
 const { emailService } = require('../utils/sendmail');
 const ShipRocketService = require('../services/shiprocket.service');
 const tezGateway = require('../services/tezPayment.service')
+const {OrderStatus} = require('../models/orders')
 
 /**
  * ORDER ITEM CRUD CONTROLLER
@@ -999,9 +1000,9 @@ const createOrderItem = async (req, res) => {
                     delivery_charge: shiprocketDeliveryCharge
                 } : undefined
             },
-            status: 'received',
+            status: OrderStatus.PLACED,
             status_timestamps: {
-                received: new Date()
+                placed: new Date()
             }
         });
 
@@ -1583,9 +1584,9 @@ const getOrderItemsByOrder = async (req, res) => {
             query.seller_id = seller_id;
         }
 
-        if (active_status) {
+        if (status) {
             // Validate active_status against enum values
-            const validStatuses = ['awaiting', 'received', 'processed', 'shipped', 'delivered', 'cancelled', 'returned'];
+            const validStatuses = ['awaiting', 'placed', 'processed', 'shipped', 'delivered', 'cancelled', 'returned'];
             if (!validStatuses.includes(active_status)) {
                 return res.status(400).json({
                     success: false,
@@ -1766,7 +1767,7 @@ const updateOrderItemStatus = async (req, res) => {
         }
 
         // Validate status
-        const validStatuses = ['awaiting', 'received', 'processed', 'shipped', 'delivered', 'cancelled', 'returned'];
+        const validStatuses = ['awaiting', 'placed', 'processed', 'shipped', 'delivered', 'cancelled', 'returned'];
         if (!active_status || !validStatuses.includes(active_status)) {
             await session.abortTransaction();
             session.endSession();
@@ -2575,6 +2576,7 @@ const updateOrderStatus = async (req, res) => {
 
         order.status = status;
         await order.save(); // Pre-save hook will update timestamps
+        await updateOrderStatusHelper(order_id)
 
         res.json({
             success: true,
@@ -2591,12 +2593,28 @@ const updateOrderStatus = async (req, res) => {
     }
 }
 
+async function updateOrderStatusHelper(orderId) {
+    const items = await OrderItem.find({ order_id: orderId });
+
+    const statuses = items.map(i => i.status);
+
+    if (statuses.every(s => s === 'delivered')) {
+        await Order.findByIdAndUpdate(orderId, { status: 'delivered' });
+    }
+    else if (statuses.some(s => s === 'shipped')) {
+        await Order.findByIdAndUpdate(orderId, { status: 'shipped' });
+    }
+    else if (statuses.every(s => s === 'cancelled')) {
+        await Order.findByIdAndUpdate(orderId, { status: 'cancelled' });
+    }
+}
+
 //13. ASSIGN DELIVERY BOY
 const assignDeliveryBoy = async (req, res) => {
     try {
         const { order_id } = req.params;
-        console.log("order_id", order_id);
         const { delivery_boy_id } = req.body;
+
         const time_slot = req.body.time_slot || new Date().toISOString().slice(11, 16);
         const date = req.body.date || new Date().toISOString().slice(0, 10);
 
@@ -2609,34 +2627,36 @@ const assignDeliveryBoy = async (req, res) => {
             });
         }
 
+        // ✅ Update only required fields
         order.delivery_info.boy_id = delivery_boy_id;
         order.delivery_info.assigned_at = new Date();
         order.delivery_info.time_slot = time_slot;
-        order.delivery_info.date = date;
+        order.delivery_info.date = new Date(date); // better to store as Date
         order.delivery_info.otp = Math.floor(1000 + Math.random() * 9000);
 
-        await order.save();
+        order.status = OrderStatus.ASSIGNED;
 
-        // Update all order items
-        await OrderItem.updateMany(
-            { order_id },
-            { delivery_boy_id }
-        );
+        await order.save();
 
         res.json({
             success: true,
             message: 'Delivery boy assigned successfully',
-            data: { id: order._id, boy_id: order.delivery_info.boy_id, otp: order.delivery_info.otp }
+            data: {
+                id: order._id,
+                boy_id: order.delivery_info.boy_id,
+                otp: order.delivery_info.otp
+            }
         });
 
     } catch (error) {
+        console.log(error)
         res.status(500).json({
             success: false,
             message: 'Failed to assign delivery boy',
             error: error.message
         });
     }
-}
+};
 
 //14. verify delivery otp
 const verifyDeliveryOTP = async (req, res) => {
@@ -2763,73 +2783,215 @@ const cancelOrder = async (req, res) => {
 
 //16. get seller orders
 const getSellerOrders = async (req, res) => {
-    try {
-      const vendorId = req.user._id;
-      const { page = 1, limit = 10 } = req.query;
-      
-      const query = { user_id: vendorId };
-      
-      const items = await OrderItem.find(query)
-        .populate('order_id')
-        .populate('product_variant_id', 'images')
-        .sort({ createdAt: -1 })
-        .limit(limit * 1)
-        .skip((page - 1) * limit);
-      
-      const count = await OrderItem.countDocuments(query);
-      
-      res.json({
-        success: true,
-        data: items,
-        pagination: {
-          total: count,
-          page: parseInt(page),
-          pages: Math.ceil(count / limit)
-        }
-      });
-      
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Failed to fetch seller orders',
-            error: error.message
-        });
+  try {
+    const vendorId = req.user._id;
+    const { page = 1, limit = 10, status } = req.query; // Added status filter
+
+    const query = { seller_id: vendorId };
+    
+    // Optional status filter
+    if (status) {
+      query.status = status;
     }
-}
+
+    const items = await OrderItem.find(query)
+      .populate('order_id')
+      .populate('product_variant_id', 'images')
+      .populate('user_id', 'username email mobile')
+      .populate({
+        path: 'order_id',
+        populate: {
+          path: 'delivery_info.boy_id',
+          populate: {
+            path: 'user_id',
+            select: 'username email mobile'
+          }
+        }
+      })
+      .sort({ date_added: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const count = await OrderItem.countDocuments(query);
+
+    res.json({
+      success: true,
+      data: items,
+      pagination: {
+        total: count,
+        page: parseInt(page),
+        pages: Math.ceil(count / limit)
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch seller orders',
+      error: error.message
+    });
+  }
+};
 
 //17. get delivery boy orders
+// const getDeliveryBoyOrders = async (req, res) => {
+//     try {
+//         const delivery_boy_id = req.user.id;
+//         console.log("Delivery Boy ID:", delivery_boy_id);
+        
+//         const { status } = req.query;
+
+//         // ✅ Get orders from Order collection (where boy_id is in delivery_info)
+//         const orderQuery = { 
+//             'delivery_info.boy_id': delivery_boy_id 
+//         };
+        
+//         if (status) {
+//             orderQuery.status = status;
+//         }
+
+//         const orders = await Order.find(orderQuery)
+//             .populate('user_id', 'username email mobile')
+//             .populate('address_id')
+//             .sort({ 'delivery_info.assigned_at': -1 });
+
+//         // ✅ Get order items from OrderItem collection
+//         const orderIds = orders.map(order => order._id);
+        
+//         const orderItemsQuery = { 
+//             order_id: { $in: orderIds },
+//             delivery_boy_id: delivery_boy_id
+//         };
+        
+//         if (status) {
+//             // Map order status to order item active_status if needed
+//             // This depends on your business logic
+//         }
+
+//         const orderItems = await OrderItem.find(orderItemsQuery)
+//             .populate({
+//                 path: 'product_id',
+//                 model: 'Product',
+//                 select: 'name images'
+//             })
+//             .populate({
+//                 path: 'product_variant_id',
+//                 model: 'Product',
+//                 select: 'variant_name variant_price variant_specialPrice variant_stockStatus variant_isActive '
+//             })
+//             .populate({
+//                 path: 'seller_id',
+//                 model: 'User',
+//                 select: 'username email mobile '
+//             });
+
+//         // Group items by order_id
+//         const itemsByOrder = {};
+//         orderItems.forEach(item => {
+//             const orderId = item.order_id.toString();
+//             if (!itemsByOrder[orderId]) {
+//                 itemsByOrder[orderId] = [];
+//             }
+//             itemsByOrder[orderId].push(item.toObject());
+//         });
+
+//         // Combine orders with their items
+//         const ordersWithItems = orders.map(order => ({
+//             ...order.toObject(),
+//             items: itemsByOrder[order._id.toString()] || []
+//         }));
+
+//         res.json({
+//             success: true,
+//             count: ordersWithItems.length,
+//             data: ordersWithItems
+//         });
+
+//     } catch (error) {
+//         console.error('Error in getDeliveryBoyOrders:', error);
+//         res.status(500).json({
+//             success: false,
+//             message: 'Failed to fetch delivery orders',
+//             error: error.message
+//         });
+//     }
+// };
+
 const getDeliveryBoyOrders = async (req, res) => {
     try {
         const delivery_boy_id = req.user.id;
+        console.log("Delivery Boy ID:", delivery_boy_id);
+        
         const { status } = req.query;
 
-        const query = { 'delivery_info.boy_id': delivery_boy_id };
-        if (status) query.status = status;
+        // ✅ CORRECT: Query OrderItem with delivery_boy_id field
+        const query = { delivery_boy_id: delivery_boy_id };
+        
+        if (status) {
+            query.active_status = status; // Use active_status from OrderItem
+        }
 
-        const orders = await Order.find(query)
-            .sort({ 'delivery_info.date': 1 })
-            .lean();
-
-        const ordersWithItems = await Promise.all(
-            orders.map(async (order) => {
-                const items = await OrderItem.find({ order_id: order._id });
-                return { ...order, items };
+        const orderItems = await OrderItem.find(query)
+            .populate({
+                path: 'order_id',
+                model: 'Order',
+                populate: [
+                    {
+                        path: 'user_id',
+                        model: 'User',
+                        select: 'username email mobile'
+                    },
+                    {
+                        path: 'address_id',
+                        model: 'Address'
+                    }
+                ]
             })
-        );
+            .populate({
+                path: 'product_id',
+                model: 'Product',
+                select: 'name images description'
+            })
+               .populate({
+                path: 'product_variant_id',
+                model: 'Product',
+                select: 'variant_name variant_price variant_specialPrice variant_stockStatus variant_isActive '
+            })
+            .populate({
+                path: 'seller_id',
+                model: 'User',
+                select: 'username email vendor_details.store_name'
+            })
+            .sort({ date_added: -1 });
+
+        // Transform the data to a more usable format
+        const formattedOrders = orderItems.map(item => {
+            const order = item.order_id?.toObject() || {};
+            const itemObj = item.toObject();
+            delete itemObj.order_id;
+            
+            return {
+                ...order,
+                delivery_status: item.active_status,
+                delivery_otp: order.delivery_info?.otp,
+                items: [itemObj] // Each order item becomes its own "order" for delivery boy
+            };
+        });
 
         res.json({
             success: true,
-            data: ordersWithItems
+            count: formattedOrders.length,
+            data: formattedOrders
         });
 
     } catch (error) {
+        console.error('Error in getDeliveryBoyOrders:', error);
         res.status(500).json({
             success: false,
             message: 'Failed to fetch delivery orders',
             error: error.message
         });
     }
-}
+};
 
 //18. process refund
 const processRefund = async (req, res) => {
@@ -2966,13 +3128,13 @@ const updateParentOrderStatus = async (orderId, session) => {
             // At least one item is processed
             parentStatus = 'processed';
         }
-        else if (uniqueStatuses.includes('received')) {
+        else if (uniqueStatuses.includes('placed')) {
             // Items are received by sellers
-            parentStatus = 'received';
+            parentStatus = 'placed';
         }
         else if (uniqueStatuses.includes('awaiting')) {
             // Items are still awaiting processing
-            parentStatus = 'received'; // Default status for new orders
+            parentStatus = 'placed'; // Default status for new orders
         }
         else {
             // Default to the most advanced status using your hierarchy
@@ -3032,7 +3194,7 @@ const determineMostAdvancedStatusForOrder = (statuses) => {
     const orderStatusHierarchy = [
         'cancelled',
         'returned',
-        'received',
+        'placed',
         'processed',
         'shipped',
         'delivered'
@@ -3059,7 +3221,7 @@ const determineMostAdvancedStatusForOrder = (statuses) => {
 const mapItemStatusToOrderStatus = (itemStatus) => {
     const mapping = {
         'awaiting': 'received',
-        'received': 'received',
+        'placed': 'placed',
         'processed': 'processed',
         'shipped': 'shipped',
         'delivered': 'delivered',
@@ -3067,7 +3229,7 @@ const mapItemStatusToOrderStatus = (itemStatus) => {
         'returned': 'returned'
     };
 
-    return mapping[itemStatus] || 'received';
+    return mapping[itemStatus] || 'placed';
 };
 
 const getOrderItemsBySeller = async (req, res) => {
@@ -3234,12 +3396,12 @@ const updateParentOrderStatusEnhanced = async (orderId, session) => {
             newOrderStatus = 'processed';
         }
         // If at least one item is received
-        else if (statusCounts['received'] > 0) {
-            newOrderStatus = 'received';
+        else if (statusCounts['placed'] > 0) {
+            newOrderStatus = 'placed';
         }
         // If all items are awaiting
         else if (statusCounts['awaiting'] === totalItems) {
-            newOrderStatus = 'received';
+            newOrderStatus = 'placed';
         }
 
         // Only update if status changed
@@ -3640,8 +3802,8 @@ const sendNotificationToAdmin = async (type, data) => {
 // Check if item status transition is valid
 function isValidItemStatusTransition(currentStatus, newStatus) {
     const transitions = {
-        'awaiting': ['received', 'cancelled'],
-        'received': ['processed', 'cancelled'],
+        'awaiting': ['placed', 'cancelled'],
+        'placed': ['processed', 'cancelled'],
         'processed': ['shipped', 'cancelled'],
         'shipped': ['delivered', 'cancelled'],
         'delivered': ['returned'],

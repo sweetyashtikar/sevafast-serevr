@@ -39,8 +39,6 @@ const authenticate = async (req, res, next) => {
             ...user.toObject(),
             permissions: userPermission.permissions
         }
-
-        req.user = user;
         next();
     } catch (error) {
         console.error('Authentication error:', error);
@@ -95,20 +93,47 @@ const optionalAuth = async (req, res, next) => {
  * 3. Authorize Permission: Dynamic Role Check
  * Checks if the user's role has the specific permission in the database.
  */
+// const authorizePermission = (permissionField) => {
+//     return async (req, res, next) => {
+//         console.log(req.user)
+//         try {
+//             if (!req.user) {
+//                 return res.status(401).json({ message: "Authentication required." });
+//             }
+//             // Look up the role settings in your Role collection
+//             const roleData = await Role.findOne({ _id: req.user.role });
+//             console.log(roleData)
+
+//             if (!roleData) {
+//                 return res.status(403).json({ message: "Role permissions not configured." });
+//             }
+
+//             // Check the specific boolean field (e.g., can_manage_products)
+//             if (roleData[permissionField] === true) {
+//                 return next();
+//             }
+
+//             return res.status(403).json({ message: "You do not have permission to perform this action." });
+//         } catch (error) {
+//             res.status(500).json({ message: "Authorization error", error: error.message });
+//         }
+//     };
+// }
+
 const authorizePermission = (permissionField) => {
     return async (req, res, next) => {
         try {
             if (!req.user) {
                 return res.status(401).json({ message: "Authentication required." });
             }
-            // Look up the role settings in your Role collection
-            const roleData = await Role.findOne({ _id: req.user.role });
+
+            // Role is already populated, just use it directly
+            const roleData = req.user.role;
 
             if (!roleData) {
                 return res.status(403).json({ message: "Role permissions not configured." });
             }
 
-            // Check the specific boolean field (e.g., can_manage_products)
             if (roleData[permissionField] === true) {
                 return next();
             }

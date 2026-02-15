@@ -625,7 +625,7 @@ ${appUrl}`;
                             </div>
                             <div>
                                 <p style="margin: 5px 0;"><strong>Payment Status:</strong> <span style="color: #28a745;">${orderData.payment?.status || 'Pending'}</span></p>
-                                <p style="margin: 5px 0;"><strong>Order Status:</strong> <span style="color: #ff9800;">${orderData.status || 'Received'}</span></p>
+                                <p style="margin: 5px 0;"><strong>Order Status:</strong> <span style="color: #ff9800;">${orderData.status || ' Order Placed'}</span></p>
                                 <p style="margin: 5px 0;"><strong>Delivery:</strong> ₹${deliveryCharge.toFixed(2)}</p>
                             </div>
                         </div>

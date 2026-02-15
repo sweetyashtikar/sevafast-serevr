@@ -79,7 +79,7 @@ router.post('/:order_id',cancelOrder)
 router.get('/get/sellerOrders',authenticate,getSellerOrders)
 
 //17. get delivery boy orders
-router.get('/deliveryBoys',getDeliveryBoyOrders)
+router.get('/get/deliveryBoys',authenticate,getDeliveryBoyOrders)
 
 //18. process refund
 router.post('/processrefund',processRefund)
