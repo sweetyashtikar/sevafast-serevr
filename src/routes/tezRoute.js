@@ -3,15 +3,25 @@ const express = require('express');
 const router = express.Router();
 const axios = require('axios');
 const qs = require('qs');
+const { default: mongoose } = require('mongoose');
+const {Order, PaymentStatus} = require('../models/orders')
+const session = require('mongoose')
+const {TEZ_PAYMENT_API_KEY} = require('../env-variables')
 
 // Generate TezGateway payment URL
 router.post('/generate-payment-url', async (req, res) => {
+   let session = null;
   try {
+      session = await mongoose.startSession();
+    session.startTransaction();
+
     const { order_id, amount, customer_mobile, customer_email, customer_name } = req.body;
     console.log("Payment request:", req.body);
-    
+
     // Validate input
     if (!order_id || !amount || !customer_mobile) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({
         success: false,
         message: 'order_id, amount, and customer_mobile are required'
@@ -20,19 +30,19 @@ router.post('/generate-payment-url', async (req, res) => {
 
     // ✅ CORRECT API URL - Use their working endpoint
     const TEZGATEWAY_API_URL = 'https://upi.tezindia.in/api/create-order';
-    
+
     // ✅ CORRECT API KEY - Use the one from their example
-    const USER_TOKEN = '0a97326de8679a25f056f04500409d36';
+    console.log("TEZ_PAYMENT_API_KEY",TEZ_PAYMENT_API_KEY)
 
     // ✅ CORRECT PARAMETER NAMES
     const formData = {
-      user_token: USER_TOKEN,           // ✅ Fixed: use 'user_token' not secret_key
+      user_token: TEZ_PAYMENT_API_KEY,           // ✅ Fixed: use 'user_token' not secret_key
       customer_mobile: customer_mobile,
       amount: amount,
       order_id: order_id,
-    //   redirect_url: 'https://yourdomain.com/payment/success', // ✅ Fixed: use 'redirect_url'
-    //   remark1: customer_name || 'Order payment',
-    //   remark2: customer_email || 'no-email@example.com'
+      //   redirect_url: 'https://yourdomain.com/payment/success', // ✅ Fixed: use 'redirect_url'
+      //   remark1: customer_name || 'Order payment',
+      //   remark2: customer_email || 'no-email@example.com'
     };
 
     console.log("Sending to TezGateway:", formData);
@@ -43,11 +53,21 @@ router.post('/generate-payment-url', async (req, res) => {
         'Content-Type': 'application/x-www-form-urlencoded',
       }
     });
-    
+
     console.log("TezGateway Response:", response.data);
 
     // ✅ CORRECT RESPONSE CHECK - status is boolean
     if (response.data && response.data.status === true) {
+      await Order.findByIdAndUpdate(order_id,{
+        'payment.transaction_id': response.data.result?.orderId,
+         'payment.gateway_response': response.data,
+      },{session})
+      
+       // Commit transaction if everything is successful
+      if (session) {
+        await session.commitTransaction();
+        session.endSession();
+      }
       return res.json({
         success: true,
         message: 'Payment URL generated',
@@ -60,6 +80,9 @@ router.post('/generate-payment-url', async (req, res) => {
         }
       });
     } else {
+      // Abort transaction on API error
+      await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({
         success: false,
         message: response.data.message || 'Failed to generate payment URL',
@@ -68,8 +91,12 @@ router.post('/generate-payment-url', async (req, res) => {
     }
 
   } catch (error) {
+    console.log("error", error)
+    // Abort transaction on exception
+    await session.abortTransaction();
+    session.endSession();
     console.error('TezGateway API error:', error.response?.data || error.message);
-    
+
     return res.status(500).json({
       success: false,
       message: 'Payment gateway error',
@@ -80,14 +107,16 @@ router.post('/generate-payment-url', async (req, res) => {
 
 // Verify payment status
 router.get('/verify-payment/:order_id', async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
   try {
     const { order_id } = req.params;
-    
-    const TEZGATEWAY_SECRET_KEY = process.env.TEZGATEWAY_SECRET_KEY;
+
+    const TEZ_PAYMENT_API_KEY = '0a97326de8679a25f056f04500409d36';
     const TEZGATEWAY_VERIFY_URL = 'https://upi.tezindia.in/api/verify-payment';
-    
+
     const formData = {
-      secret_key: TEZGATEWAY_SECRET_KEY,
+      secret_key: TEZ_PAYMENT_API_KEY,
       order_id: order_id
     };
 
@@ -97,12 +126,41 @@ router.get('/verify-payment/:order_id', async (req, res) => {
       }
     });
 
-    res.json({
-      success: true,
-      data: response.data
-    });
+    if (response.status === true) {
+      await Order.findByIdAndUpdate(order_id, {
+        'payment.status': PaymentStatus.PAID,
+        'payment.paid_at': new Date()
+      }, {
+        session,
+        new: true
+      })
+
+
+      await session.commitTransaction();
+      session.endSession();
+
+      res.json({
+        success: true,
+        data: response.data
+      });
+    } else {
+      await Order.findByIdAndUpdate(order_id, {
+        'payment.status': PaymentStatus.FAILED,
+      }, { session })
+      await session.commitTransaction(); // or abortTransaction() based on your logic
+      session.endSession();
+
+
+      return res.json({
+        success: true,
+        data: response.data
+      });
+    }
 
   } catch (error) {
+    // Abort transaction on error
+    await session.abortTransaction();
+    session.endSession();
     console.error('Verify payment error:', error);
     res.status(500).json({
       success: false,

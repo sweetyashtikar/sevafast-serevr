@@ -660,6 +660,25 @@ productSchema.methods.updateVariantStock = function (variantIds, quantity) {
   }
 };
 
+// Add this to your schema definition
+productSchema.pre('save', function(next) {
+  // If product type is variable, remove simpleProduct
+  if (this.productType === PRODUCT_TYPES.VARIABLE) {
+    this.simpleProduct = undefined;
+    
+    // If stock level type is variable_level, remove productLevelStock
+    if (this.variantStockLevelType === VARIANT_STOCK_LEVEL_TYPES.VARIABLE_LEVEL) {
+      this.productLevelStock = undefined;
+    }
+  }
+  
+  // If product type is simple or digital, remove variants
+  if (this.productType === PRODUCT_TYPES.SIMPLE || this.productType === PRODUCT_TYPES.DIGITAL) {
+    this.variants = [];
+    this.productLevelStock = undefined;
+  }
+});
+
 // Increment views
 productSchema.methods.incrementViews = function () {
   this.views += 1;

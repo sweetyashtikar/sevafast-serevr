@@ -671,7 +671,7 @@ const getAllProductsWithFilters = async (req, res) => {
     // Stock filter
     if (inStock === "true") {
       query.$or = [
-        { "simpleProduct.stockStatus": STOCK_STATUS.IN_STOCK },
+        { "simpleProduct.sp_stockStatus": STOCK_STATUS.IN_STOCK },
         { "productLevelStock.stockStatus": STOCK_STATUS.IN_STOCK },
         { "variants.stockStatus": STOCK_STATUS.IN_STOCK },
       ];
@@ -752,6 +752,7 @@ const getVendorProducts = async (req, res) => {
     // Execute query
     const products = await Product.find(query)
       .populate("categoryId", "name")
+      .populate("vendorId", "username email mobile")
       .sort(sort)
       .skip(skip)
       .limit(parseInt(limit));
@@ -970,8 +971,8 @@ const updateProductStock = async (req, res) => {
 
     // Update simple product stock
     if (product.productType === PRODUCT_TYPES.SIMPLE) {
-      product.simpleProduct.totalStock = parseInt(stock);
-      product.simpleProduct.stockStatus =
+      product.simpleProduct.sp_totalStock = parseInt(stock);
+      product.simpleProduct.sp_stockStatus =
         parseInt(stock) > 0 ? STOCK_STATUS.IN_STOCK : STOCK_STATUS.OUT_OF_STOCK;
     }
 

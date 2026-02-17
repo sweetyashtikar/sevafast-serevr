@@ -159,7 +159,7 @@ const deleteUser = async (req, res) => {
 const getMyProfile = async (req, res) => {
   try {
     // Get user ID from authentication middleware (assuming you have auth middleware)
-    const userId = req.user.id;
+    const userId = req.user._id;
     
     // Find user by ID, populate role, exclude sensitive fields
     const user = await User.findById(userId)

@@ -104,9 +104,9 @@ const apiUrl = "https://upi.tezindia.in/api/create-order"
 class TezGatewayCreateOrderAPI {
     constructor() {
         this.apiUrl = apiUrl;
-        this.userToken = process.env.TEZ_USER_TOKEN || "e8d2a2f1ac98d41d3b7422fd11ab98fa";
-        this.merchantId = process.env.TEZ_MERCHANT_ID;
-        this.redirectUrl = process.env.TEZ_REDIRECT_URL || "https://yourdomain.com/api/payment/tez-callback";
+        this.userToken = TEZ_USER_TOKEN || "e8d2a2f1ac98d41d3b7422fd11ab98fa";
+        // this.merchantId = process.env.TEZ_MERCHANT_ID;
+        // this.redirectUrl = process.env.TEZ_REDIRECT_URL || "https://yourdomain.com/api/payment/tez-callback";
     }
 
     // Validate mobile number format for Tez

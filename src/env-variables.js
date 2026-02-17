@@ -21,6 +21,10 @@ const JWT_SECRET = process.env.JWT_SECRET;
 
 const JWT_EXPIRE = process.env.JWT_EXPIRE;
 
+const FRONTEND_URL = process.env.FRONTEND_URL
+
+const TEZ_PAYMENT_API_KEY = process.env.TEZ_PAYMENT_API_KEY
+
 module.exports = {
   MONGODB_URI,
   PORT,
@@ -31,5 +35,7 @@ module.exports = {
   JWT_EXPIRE,
   GOOGLE_SMTP_HOST,
   GOOGLE_SMTP_USER,
-  NODE_ENV
+  NODE_ENV,
+  FRONTEND_URL,
+  TEZ_PAYMENT_API_KEY
 };

@@ -206,7 +206,7 @@ const createSeller = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to register seller',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+            error: NODE_ENV === 'development' ? error.message : undefined
         });
     }
 };

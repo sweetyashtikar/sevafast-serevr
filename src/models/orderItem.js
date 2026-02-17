@@ -8,6 +8,7 @@ const ActiveStatus = {
   DELIVERED: "delivered",
   CANCELLED: "cancelled",
   RETURNED: "returned",
+  ASSIGNED: 'assigned', 
 };
 
 const orderItemSchema = new mongoose.Schema(

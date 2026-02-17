@@ -948,26 +948,6 @@ const createOrderItem = async (req, res) => {
         // Calculate total
         const total = itemsTotal + finalDeliveryCharge - (parseFloat(discount) || 0) - promoDiscount + (parseFloat(tax_amount) || 0);
 
-        // Check if payment method is Tez
-        const isTezPayment = payment_method === PaymentMethod.TEZ || payment_method === 'tez';
-
-        // **VALIDATE MOBILE FOR TEZ PAYMENT**
-        let paymentMobile = mobile || user.phone || userAddress.mobile;
-        
-        if (isTezPayment) {
-            // Ensure we have a mobile number for Tez payment
-            if (!paymentMobile) {
-                throw new Error('Mobile number is required for Tez payment');
-            }
-            
-            // Validate mobile format for Tez
-            const formattedMobile = tezGateway.formatMobileNumber(paymentMobile);
-            if (!tezGateway.validateMobileNumber(formattedMobile)) {
-                throw new Error(`Invalid mobile number for Tez payment: ${paymentMobile}. Please provide a valid 10-digit Indian mobile number.`);
-            }
-            paymentMobile = formattedMobile; // Use formatted mobile
-        }
-
         // Create Order
         const order = new Order({
             user_id,
@@ -1064,93 +1044,93 @@ const createOrderItem = async (req, res) => {
         });
 
         // **TEZ PAYMENT INTEGRATION**
-        let paymentResponse = null;
-        if (isTezPayment) {
-            try {
-                console.log('Initiating Tez payment for order:', {
-                    orderId: order._id,
-                    orderNumber: order.order_number,
-                    amount: total,
-                    mobile: paymentMobile
-                });
+        // let paymentResponse = null;
+        // if (isTezPayment) {
+        //     try {
+        //         console.log('Initiating Tez payment for order:', {
+        //             orderId: order._id,
+        //             orderNumber: order.order_number,
+        //             amount: total,
+        //             mobile: paymentMobile
+        //         });
                 
-                // Use order_number as order_id for Tez
-                const tezOrderId = order.order_number || `ORD_${order._id}`;
+        //         // Use order_number as order_id for Tez
+        //         const tezOrderId = order.order_number || `ORD_${order._id}`;
                 
-                paymentResponse = await tezGateway.createPaymentOrder({
-                    customerMobile: paymentMobile,
-                    amount: total.toString(),
-                    orderId: tezOrderId,
-                    remark1: `Order: ${order.order_number}`.substring(0, 50),
-                    remark2: `Customer: ${user.name || user.email}`.substring(0, 50)
-                });
+        //         paymentResponse = await tezGateway.createPaymentOrder({
+        //             customerMobile: paymentMobile,
+        //             amount: total.toString(),
+        //             orderId: tezOrderId,
+        //             remark1: `Order: ${order.order_number}`.substring(0, 50),
+        //             remark2: `Customer: ${user.name || user.email}`.substring(0, 50)
+        //         });
 
-                console.log('Tez payment initiated successfully:', {
-                    orderId: order._id,
-                    paymentUrl: paymentResponse.paymentUrl,
-                    transactionId: paymentResponse.transactionId,
-                    message: paymentResponse.message
-                });
+        //         console.log('Tez payment initiated successfully:', {
+        //             orderId: order._id,
+        //             paymentUrl: paymentResponse.paymentUrl,
+        //             transactionId: paymentResponse.transactionId,
+        //             message: paymentResponse.message
+        //         });
 
-                // Update order with payment details
-                await Order.findByIdAndUpdate(order._id, {
-                    'payment.transaction_id': paymentResponse.transactionId,
-                    'payment.payment_url': paymentResponse.paymentUrl,
-                    'payment.gateway_response': paymentResponse.paymentData,
-                    'payment.remark1': paymentResponse.paymentData.remark1,
-                    'payment.remark2': paymentResponse.paymentData.remark2
-                });
+        //         // Update order with payment details
+        //         await Order.findByIdAndUpdate(order._id, {
+        //             'payment.transaction_id': paymentResponse.transactionId,
+        //             'payment.payment_url': paymentResponse.paymentUrl,
+        //             'payment.gateway_response': paymentResponse.paymentData,
+        //             'payment.remark1': paymentResponse.paymentData.remark1,
+        //             'payment.remark2': paymentResponse.paymentData.remark2
+        //         });
 
-            } catch (paymentError) {
-                console.error('Failed to create Tez payment:', {
-                    error: paymentError.message,
-                    orderId: order._id,
-                    mobile: paymentMobile
-                });
+        //     } catch (paymentError) {
+        //         console.error('Failed to create Tez payment:', {
+        //             error: paymentError.message,
+        //             orderId: order._id,
+        //             mobile: paymentMobile
+        //         });
                 
-                // Update order to reflect payment failure
-                await Order.findByIdAndUpdate(order._id, {
-                    'payment.status': 'failed',
-                    'payment.failure_reason': paymentError.message
-                });
+        //         // Update order to reflect payment failure
+        //         await Order.findByIdAndUpdate(order._id, {
+        //             'payment.status': 'failed',
+        //             'payment.failure_reason': paymentError.message
+        //         });
 
-                // Rollback stock for Tez payment failure
-                await mongoose.startSession().then(async (rollbackSession) => {
-                    rollbackSession.startTransaction();
-                    try {
-                        for (const item of itemsWithDetails) {
-                            const product = await Product.findById(item.product_id).session(rollbackSession);
-                            if (product.productType === PRODUCT_TYPES.SIMPLE) {
-                                product.simpleProduct.sp_totalStock += item.quantity;
-                                product.simpleProduct.sp_stockStatus = STOCK_STATUS.IN_STOCK;
-                            } else if (product.productType === PRODUCT_TYPES.VARIABLE) {
-                                const variant = product.variants.id(item.product_variant_id);
-                                if (variant) {
-                                    variant.variant_totalStock += item.quantity;
-                                    variant.variant_stockStatus = STOCK_STATUS.IN_STOCK;
-                                }
-                            }
-                            await product.save({ session: rollbackSession });
-                        }
-                        await rollbackSession.commitTransaction();
-                    } catch (rollbackError) {
-                        console.error('Failed to rollback stock:', rollbackError);
-                        await rollbackSession.abortTransaction();
-                    } finally {
-                        rollbackSession.endSession();
-                    }
-                });
+        //         // Rollback stock for Tez payment failure
+        //         await mongoose.startSession().then(async (rollbackSession) => {
+        //             rollbackSession.startTransaction();
+        //             try {
+        //                 for (const item of itemsWithDetails) {
+        //                     const product = await Product.findById(item.product_id).session(rollbackSession);
+        //                     if (product.productType === PRODUCT_TYPES.SIMPLE) {
+        //                         product.simpleProduct.sp_totalStock += item.quantity;
+        //                         product.simpleProduct.sp_stockStatus = STOCK_STATUS.IN_STOCK;
+        //                     } else if (product.productType === PRODUCT_TYPES.VARIABLE) {
+        //                         const variant = product.variants.id(item.product_variant_id);
+        //                         if (variant) {
+        //                             variant.variant_totalStock += item.quantity;
+        //                             variant.variant_stockStatus = STOCK_STATUS.IN_STOCK;
+        //                         }
+        //                     }
+        //                     await product.save({ session: rollbackSession });
+        //                 }
+        //                 await rollbackSession.commitTransaction();
+        //             } catch (rollbackError) {
+        //                 console.error('Failed to rollback stock:', rollbackError);
+        //                 await rollbackSession.abortTransaction();
+        //             } finally {
+        //                 rollbackSession.endSession();
+        //             }
+        //         });
 
-                return res.status(400).json({
-                    success: false,
-                    message: 'Payment initialization failed',
-                    error: paymentError.message,
-                    order_id: order._id,
-                    order_number: order.order_number,
-                    requires_payment_retry: true
-                });
-            }
-        }
+        //         return res.status(400).json({
+        //             success: false,
+        //             message: 'Payment initialization failed',
+        //             error: paymentError.message,
+        //             order_id: order._id,
+        //             order_number: order.order_number,
+        //             requires_payment_retry: true
+        //         });
+        //     }
+        // }
 
         // Create ShipRocket shipment for non-Tez prepaid orders
         if (shipping_method === 'shiprocket' && payment_method !== PaymentMethod.COD && !isTezPayment) {
@@ -1546,7 +1526,7 @@ const getOrderItemsByOrder = async (req, res) => {
         const { order_id } = req.params;
         const {
             seller_id,
-            active_status,
+            status,
             group_by_seller, // Added this parameter
             populate_seller = 'true',
             populate_product = 'true',
@@ -2635,8 +2615,14 @@ const assignDeliveryBoy = async (req, res) => {
         order.delivery_info.otp = Math.floor(1000 + Math.random() * 9000);
 
         order.status = OrderStatus.ASSIGNED;
+      const orderItem = await OrderItem.findOne({ order_id: order_id });
+         orderItem.status = ActiveStatus.ASSIGNED
+         orderItem.status_history.push({
+            status: ActiveStatus.ASSIGNED,
+            timestamp: new Date()})
 
         await order.save();
+        await orderItem.save();
 
         res.json({
             success: true,

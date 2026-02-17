@@ -187,7 +187,7 @@ class PermissionChecker {
                 res.status(500).json({
                     success: false,
                     message: 'Error checking permissions',
-                    error: process.env.NODE_ENV === 'development' ? error.message : undefined
+                    error: NODE_ENV === 'development' ? error.message : undefined
                 });
             }
         };

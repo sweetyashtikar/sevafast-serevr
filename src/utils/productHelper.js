@@ -123,7 +123,6 @@ function mapSEO(body){
 
 function addProductTypeData(productData, body, toInt, toFloat) {
   const { productType } = body;
-  console.log("product type",productType)
 
   // Simple Product
   if (productType === PRODUCT_TYPES.SIMPLE) {
@@ -134,6 +133,9 @@ function addProductTypeData(productData, body, toInt, toFloat) {
       sp_totalStock: toInt(body.sp_totalStock || body.simpleProduct.sp_totalStock || 0),
       sp_stockStatus: body.sp_stockStatus ||  body.simpleProduct.sp_stockStatus || STOCK_STATUS.IN_STOCK,
     };
+    // Ensure variants is empty for simple products
+    delete productData.variants
+    delete productData.productLevelStock;
   }
 
   // Digital Product
@@ -145,9 +147,10 @@ function addProductTypeData(productData, body, toInt, toFloat) {
       sp_totalStock: toInt(body.sp_totalStock || body.simpleProduct.sp_totalStock || 0), 
       sp_stockStatus: STOCK_STATUS.IN_STOCK,
     };
+    // Ensure variants is empty for digital products
+    delete productData.variants 
+
       if (isDefined(body.variantStockLevelType || body.productType)) {
-        console.log(body.variantStockLevelType)
-        console.log(body.productType)
       // If switching from product-level to variant-level, remove productLevelStock
       if ((body.variantStockLevelType === VARIANT_STOCK_LEVEL_TYPES.VARIABLE_LEVEL) && (body.productType === PRODUCT_TYPES.DIGITAL)) {
         delete product.productLevelStock;
@@ -159,14 +162,18 @@ function addProductTypeData(productData, body, toInt, toFloat) {
   if (productType === PRODUCT_TYPES.VARIABLE) {
     productData.variants = buildVariants(body, toInt, toFloat);
 
+    delete productData.simpleProduct;
+
     // Product level stock management
     if (body.variantStockLevelType === VARIANT_STOCK_LEVEL_TYPES.PRODUCT_LEVEL) {
-      console.log(productData)
       productData.productLevelStock = {
         pls_sku: body.pls_sku || body.productLevelStock.pls_sku || "",
         pls_totalStock: toInt(body.pls_totalStock || body.productLevelStock.pls_totalStock || 0),
         pls_stockStatus:body.pls_stockStatus || body.productLevelStock.pls_stockStatus || STOCK_STATUS.IN_STOCK,
       };
+    }else {
+      // If not product level stock, remove productLevelStock
+      delete productData.productLevelStock;
     }
   }
 }

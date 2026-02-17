@@ -468,7 +468,7 @@ class EmailService {
 
     // ✅ Approval Email Template
     getApprovalEmailTemplate(user) {
-        const appUrl = process.env.APP_URL || 'http://localhost:3000';
+        const appUrl = FRONTEND_URL || 'http://localhost:3000';
         const userName = user.name || user.username || user.email;
         
         return `
@@ -528,7 +528,7 @@ class EmailService {
 
     // ✅ Approval Email Text Version
     getApprovalEmailText(user) {
-        const appUrl = process.env.APP_URL || 'http://localhost:3000';
+        const appUrl = FRONTEND_URL || 'http://localhost:3000';
         const userName = user.name || user.username || user.email;
         
         return `Hello ${userName},
@@ -553,7 +553,7 @@ ${appUrl}`;
     getOrderConfirmationTemplate(orderData, user, items) {
         console.log("📧 Generating order confirmation template for order:", orderData.order_number);
         
-        const appUrl = process.env.APP_URL || 'http://localhost:3000';
+        const appUrl = FRONTEND_URL || 'http://localhost:3000';
         const userName = user.name || user.username || user.email;
         const orderDate = new Date(orderData.createdAt || new Date()).toLocaleDateString('en-IN', {
             weekday: 'long',
@@ -738,7 +738,7 @@ ${appUrl}`;
         const taxAmount = orderData.tax_amount || 0;
         const totalPayable = orderData.total_payable || orderData.final_total || (subtotal + deliveryCharge + taxAmount - discount);
         
-        const appUrl = process.env.APP_URL || 'http://localhost:3000';
+        const appUrl = FRONTEND_URL || 'http://localhost:3000';
 
         return `Dear ${userName},
 

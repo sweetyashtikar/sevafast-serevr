@@ -12,10 +12,10 @@ const createDeliveryBoyProfile = async (userId, vendorId) => {
     const deliveryBoyData = {
       user_id: userId,
       vendor_id: vendorId,
-      
+
       // Initialize with empty/default values - vendor will fill later
       personal_details: {
- alternate_mobile: null,
+        alternate_mobile: null,
         profile_image: null,
         date_of_birth: null,
         gender: null,
@@ -28,7 +28,7 @@ const createDeliveryBoyProfile = async (userId, vendorId) => {
           coordinates: [0, 0]
         }
       },
-      
+
       verification: {
         aadhar_number: null,
         aadhar_verified: false,
@@ -50,9 +50,9 @@ const createDeliveryBoyProfile = async (userId, vendorId) => {
           verified_on: null
         }
       },
-      
+
       employment: {
-        employee_id: `DB${Date.now()}${Math.floor(Math.random() * 1000)}`, // Auto-generated
+        employee_id: `DB${Date.now()}${Math.floor(Math.random() * 10)}`, // Auto-generated
         joining_date: Date.now(),
         employment_type: 'full_time', // Default
         salary_type: 'per_delivery', // Default
@@ -60,7 +60,7 @@ const createDeliveryBoyProfile = async (userId, vendorId) => {
         commission_per_delivery: 30, // Default
         status: false // Active by default
       },
-      
+
       vehicle: {
         type: null,
         number: null,
@@ -70,7 +70,7 @@ const createDeliveryBoyProfile = async (userId, vendorId) => {
         rc_image: null,
         is_verified: false
       },
-      
+
       bank_details: {
         account_holder: null,
         account_number: null,
@@ -80,7 +80,7 @@ const createDeliveryBoyProfile = async (userId, vendorId) => {
         upi_id: null,
         verified: false
       },
-      
+
       performance: {
         total_deliveries: 0,
         successful_deliveries: 0,
@@ -92,9 +92,9 @@ const createDeliveryBoyProfile = async (userId, vendorId) => {
         total_payouts: 0,
         current_balance: 0
       },
-      
+
       availability: {
-        is_available: false,
+        is_available: true,
         current_location: {
           type: 'Point',
           coordinates: [0, 0],
@@ -106,7 +106,7 @@ const createDeliveryBoyProfile = async (userId, vendorId) => {
         max_delivery_limit: 5,
         current_deliveries: []
       },
-      
+
       schedule: [], // Empty array - vendor will set later
       documents: [], // Empty array - vendor will upload later
       ratings: [], // Empty array - will be populated after deliveries
@@ -121,7 +121,7 @@ const createDeliveryBoyProfile = async (userId, vendorId) => {
 
     console.log(`✅ Delivery boy profile created with ID: ${deliveryBoy._id}`);
     return deliveryBoy;
-    
+
   } catch (error) {
     console.error('❌ Error creating delivery boy profile:', error);
     throw error;
@@ -136,8 +136,8 @@ const uploadDeliveryBoyProfile = async (req, res) => {
     const { user_id, vendor_id } = req.body;
 
     // Check if user exists and is delivery boy
-    const user = await User.findOne({ 
-      _id: user_id 
+    const user = await User.findOne({
+      _id: user_id
     });
 
     if (!user) {
@@ -188,7 +188,7 @@ const uploadDeliveryBoyProfile = async (req, res) => {
       notes: req.body.notes
     });
 
-    const deliveryBoy = await DeliveryBoy.findOneAndUpdate({user_id : user_id}, {uploadDeliveryBoyDocuments})
+    const deliveryBoy = await DeliveryBoy.findOneAndUpdate({ user_id: user_id }, { uploadDeliveryBoyDocuments })
     await deliveryBoy.save();
 
     res.status(201).json({
@@ -199,7 +199,7 @@ const uploadDeliveryBoyProfile = async (req, res) => {
 
   } catch (error) {
     console.error('Create delivery boy error:', error);
-    
+
     // Handle duplicate key errors
     if (error.code === 11000) {
       const field = Object.keys(error.keyPattern)[0];
@@ -224,38 +224,38 @@ const uploadDeliveryBoyProfile = async (req, res) => {
 const getVendorDeliveryBoys = async (req, res) => {
   try {
     const { vendorId } = req.params;
-    const { 
-      page = 1, 
-      limit = 10, 
-      status, 
-      search, 
+    const {
+      page = 1,
+      limit = 10,
+      status,
+      search,
       vehicle_type,
       is_available,
-      min_rating 
+      min_rating
     } = req.query;
 
     // Build query
     const query = { vendor_id: vendorId };
-    
-    // // Filter by employment status
-    // if (status !== undefined) {
-    //   query['employment.status'] = status === 'true';
-    // }
 
-    // // Filter by availability
-    // if (is_available !== undefined) {
-    //   query['availability.is_available'] = is_available === 'true';
-    // }
+    // Filter by employment status
+    if (status !== undefined) {
+      query['employment.status'] = status === 'true';
+    }
 
-    // // Filter by vehicle type
-    // if (vehicle_type) {
-    //   query['vehicle.type'] = vehicle_type;
-    // }
+    //Filter by availability
+    if (is_available !== undefined) {
+      query['availability.is_available'] = is_available === 'true';
+    }
 
-    // // Filter by minimum rating
-    // if (min_rating) {
-    //   query['performance.avg_rating'] = { $gte: parseFloat(min_rating) };
-    // }
+    //Filter by vehicle type
+    if (vehicle_type) {
+      query['vehicle.type'] = vehicle_type;
+    }
+
+    //Filter by minimum rating
+    if (min_rating) {
+      query['performance.avg_rating'] = { $gte: parseFloat(min_rating) };
+    }
 
     // Search by name, email, mobile, employee_id
     if (search) {
@@ -269,7 +269,7 @@ const getVendorDeliveryBoys = async (req, res) => {
 
     // Pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    
+
     // Execute query
     const deliveryBoys = await DeliveryBoy.find(query)
       .populate('user_id', 'username email mobile status')
@@ -282,20 +282,24 @@ const getVendorDeliveryBoys = async (req, res) => {
 
     // Get statistics
     const stats = await DeliveryBoy.aggregate([
-      { $match: { vendor_id: vendorId } },
-      { $group: {
-        _id: null,
-        total_delivery_boys: { $sum: 1 },
-        active_delivery_boys: { 
-          $sum: { $cond: ['$employment.status', 1, 0] } 
-        },
-        available_delivery_boys: {
-          $sum: { $cond: ['$availability.is_available', 1, 0] }
-        },
-        avg_rating_vendor: { $avg: '$performance.avg_rating' },
-        total_deliveries: { $sum: '$performance.total_deliveries' },
-        total_earnings: { $sum: '$performance.total_earnings' }
-      }}
+      {
+        $match: { vendor_id: new mongoose.Types.ObjectId(vendorId) } // Use the converted ID here
+      },
+      {
+        $group: {
+          _id: null,
+          total_delivery_boys: { $sum: 1 },
+          active_delivery_boys: {
+            $sum: { $cond: ['$employment.status', 1, 0] }
+          },
+          available_delivery_boys: {
+            $sum: { $cond: ['$availability.is_available', 1, 0] }
+          },
+          avg_rating_vendor: { $avg: '$performance.avg_rating' },
+          total_deliveries: { $sum: '$performance.total_deliveries' },
+          total_earnings: { $sum: '$performance.total_earnings' }
+        }
+      }
     ]);
 
     res.status(200).json({
@@ -341,7 +345,7 @@ const getDeliveryBoyById = async (req, res) => {
       .populate('availability.serviceable_zones')
       .populate('availability.current_deliveries', 'order_id status');
 
-      console.log("deliveryBoy", deliveryBoy)
+    console.log("deliveryBoy", deliveryBoy)
 
     if (!deliveryBoy) {
       return res.status(404).json({
@@ -358,7 +362,7 @@ const getDeliveryBoyById = async (req, res) => {
 
   } catch (error) {
     console.error('Get delivery boy error:', error);
-    
+
     if (error.name === 'CastError') {
       return res.status(400).json({
         success: false,
@@ -433,9 +437,9 @@ const updateDeliveryBoy = async (req, res) => {
     const deliveryBoy = await DeliveryBoy.findByIdAndUpdate(
       id,
       { $set: updateData },
-      { 
-        new: true, 
-        runValidators: true 
+      {
+        new: true,
+        runValidators: true
       }
     ).populate('user_id', 'username email mobile');
 
@@ -455,7 +459,7 @@ const updateDeliveryBoy = async (req, res) => {
       if (updateData.personal_details.mobile) {
         userUpdate.mobile = updateData.personal_details.mobile;
       }
-      
+
       await User.findByIdAndUpdate(
         deliveryBoy.user_id._id,
         { $set: userUpdate }
@@ -470,7 +474,7 @@ const updateDeliveryBoy = async (req, res) => {
 
   } catch (error) {
     console.error('Update delivery boy error:', error);
-    
+
     if (error.code === 11000) {
       return res.status(400).json({
         success: false,
@@ -497,11 +501,11 @@ const updateStatus = async (req, res) => {
 
     const deliveryBoy = await DeliveryBoy.findByIdAndUpdate(
       id,
-      { 
-        $set: { 
+      {
+        $set: {
           'employment.status': status,
           'availability.is_available': status // Also update availability
-        } 
+        }
       },
       { new: true }
     );
@@ -647,11 +651,11 @@ const updateAvailability = async (req, res) => {
 const verifyDocuments = async (req, res) => {
   try {
     const { id } = req.params;
-    const { 
-      verify_aadhar, 
-      verify_pan, 
+    const {
+      verify_aadhar,
+      verify_pan,
       verify_driving_license,
-      background_check_status 
+      background_check_status
     } = req.body;
 
     const updateData = {};
@@ -731,9 +735,9 @@ const deleteDeliveryBoy = async (req, res) => {
         { user_id: deliveryBoy.vendor_id },
         {
           $pull: { 'delivery_team.delivery_boys': { delivery_boy_id: id } },
-          $inc: { 
+          $inc: {
             'delivery_team.total_count': -1,
-            'delivery_team.active_count': -1 
+            'delivery_team.active_count': -1
           }
         }
       );
@@ -796,19 +800,20 @@ const permanentDelete = async (req, res) => {
   }
 };
 
-module.exports = {createDeliveryBoyProfile,
-    uploadDeliveryBoyProfile,
-    getVendorDeliveryBoys,
-    getDeliveryBoyById,
-    getDeliveryBoyByUserId,
-   
-    updateDeliveryBoy,
-    updateStatus,
-    updateLocation,
-    updateAvailability,
-    verifyDocuments,
-    deleteDeliveryBoy,
-    permanentDelete
+module.exports = {
+  createDeliveryBoyProfile,
+  uploadDeliveryBoyProfile,
+  getVendorDeliveryBoys,
+  getDeliveryBoyById,
+  getDeliveryBoyByUserId,
+
+  updateDeliveryBoy,
+  updateStatus,
+  updateLocation,
+  updateAvailability,
+  verifyDocuments,
+  deleteDeliveryBoy,
+  permanentDelete
 
 
 }
