@@ -113,6 +113,53 @@ const getAllUsers = async (req, res) => {
     }
 }
 
+const getAllUsersWithFilters = async (req, res) => {
+    console.log(req.body)
+    const { role } = req.body;
+    
+    try {
+        let query = {};
+        
+        // If role is provided, search for it in Role collection
+        if (role) {
+            // Find the role in Role collection by name (case insensitive)
+            const roleDoc = await Roles.findOne({ 
+                role: { $regex: new RegExp(`^${role}$`, 'i') } 
+            });
+            
+            if (!roleDoc) {
+                return res.status(404).json({ 
+                    success: false, 
+                    message: `Role '${role}' not found` 
+                });
+            }
+            
+            // Add role ID to query
+            query.role = roleDoc._id;
+        }
+        
+        // Find users with the query (either all users or filtered by role)
+        const users = await User.find(query).populate('role');
+        
+        // Apply the non-admin filter
+        const nonAdminUsers = users.filter(user => 
+            user.role && user.role.name !== 'admin'
+        );
+        
+        res.status(200).json({ 
+            success: true, 
+            count: nonAdminUsers.length,
+            data: nonAdminUsers 
+        });
+        
+    } catch (error) {
+        res.status(500).json({ 
+            success: false, 
+            message: error.message 
+        });
+    }
+}
+
 const getAllVendors = async (req, res) => {
     const vendorRole = await Roles.findOne({ role: 'vendor' });
     if (!vendorRole) {
@@ -194,5 +241,6 @@ module.exports = {
     updateUser,
     deleteUser,
     getAllVendors,
-    getMyProfile
+    getMyProfile,
+    getAllUsersWithFilters
 };

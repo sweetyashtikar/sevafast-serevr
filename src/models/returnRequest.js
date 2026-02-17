@@ -23,9 +23,7 @@ const returnRequestSchema = new mongoose.Schema(
     },
     // Product Details
     product_variant_id: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "ProductVariant",
-      required: true,
+          type: mongoose.Schema.Types.ObjectId,
     },
     order_id: {
       type: mongoose.Schema.Types.ObjectId,

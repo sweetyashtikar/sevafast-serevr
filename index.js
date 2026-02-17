@@ -40,6 +40,7 @@ const viewCartRoute = require('./src/routes/viewCartRoute')
 const userPermissionRoute = require('./src/routes/userPermissionRoute')
 const tezRoute = require('./src/routes/tezRoute')
 const DeliveryBoyRoute = require('./src/routes/deliveryBoyRoutes')
+const ReturnRequestRoute = require('./src/routes/returnRequestRoute')
 
 
 
@@ -92,6 +93,7 @@ app.use('/api/brands', brandRoutes);
 app.use('/api/viewCart', viewCartRoute)
 app.use('/api/userPermission',userPermissionRoute )
 app.use('/api/delivery_boy',DeliveryBoyRoute)
+app.use('/api/return_request',ReturnRequestRoute)
 
 
 
