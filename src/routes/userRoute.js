@@ -12,6 +12,7 @@ router.delete('/users/:id',User.deleteUser);
 router.get('/users/vendors',User.getAllVendors);
 router.get('/users/profile/me',authenticate,User.getMyProfile);
 router.get('/users/all',authenticate,checkIfAdmin,User.getAllUsersWithFilters)
+router.patch('/users/status/:id',authenticate,checkIfAdmin,User.Updatestatus)
 
 
 module.exports = router;

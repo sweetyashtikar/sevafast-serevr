@@ -189,6 +189,24 @@ const updateUser = async (req, res) => {
     }
 }
 
+const Updatestatus = async (req, res) => {
+    try {
+        const { id } = req.params;
+        console.log("id", id)
+        const {newStatus} = req.body;
+        console.log("newStatus", newStatus)
+        const updatedUser = await User.findByIdAndUpdate(id, {status :newStatus}, { new: true });
+        if (!updatedUser) return res.status(404).json({success: false, message: 'User not found' });   
+        res.status(200).json({  
+            success: true,
+            message: 'User status updated successfully',
+            data :updatedUser
+        });
+    } catch (error) {
+        res.status(500).json({success: false,  message: error.message });
+    }
+}
+
 const deleteUser = async (req, res) => {
     try {
         const { id } = req.params;  
@@ -242,5 +260,6 @@ module.exports = {
     deleteUser,
     getAllVendors,
     getMyProfile,
-    getAllUsersWithFilters
+    getAllUsersWithFilters,
+    Updatestatus
 };

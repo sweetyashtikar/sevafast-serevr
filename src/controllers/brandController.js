@@ -4,8 +4,10 @@ const Brand = require('../models/brand');
 // @route   POST /api/brands
 // @access  Public/Private (adjust as needed)
 const createBrand = async (req, res) => {
+  const { name, status } = req.body;
+    const { icon } = req.files;
+  console.log("req.body", req.body)
   try {
-    const { name, icon, status } = req.body;
 
     // Check if brand already exists
     const existingBrand = await Brand.findOne({ name });

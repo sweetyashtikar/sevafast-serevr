@@ -11,6 +11,7 @@ const { emailService } = require('../utils/sendmail');
 const ShipRocketService = require('../services/shiprocket.service');
 const tezGateway = require('../services/tezPayment.service')
 const {OrderStatus} = require('../models/orders')
+const DeliveryBoy = require('../models/deliveryBoy')
 
 /**
  * ORDER ITEM CRUD CONTROLLER
@@ -2904,64 +2905,68 @@ const getSellerOrders = async (req, res) => {
 
 const getDeliveryBoyOrders = async (req, res) => {
     try {
-        const delivery_boy_id = req.user.id;
+        const delivery_boy_id = req.user._id;
         console.log("Delivery Boy ID:", delivery_boy_id);
+
+        const findDeliveryBoy = await DeliveryBoy({user_id : delivery_boy_id})
+        console.log("delivery boy", findDeliveryBoy)
         
         const { status } = req.query;
 
-        // ✅ CORRECT: Query OrderItem with delivery_boy_id field
-        const query = { delivery_boy_id: delivery_boy_id };
+        // First, find all orders assigned to this delivery boy
+        const orderQuery = { 
+            'delivery_info.boy_id': findDeliveryBoy._id  // Look in the Order document
+        };
+        console.log("orderQuery",orderQuery)
         
+        // If status filter is provided, add it to the order query
         if (status) {
-            query.active_status = status; // Use active_status from OrderItem
+            orderQuery.status = status; // Filter by order.status (e.g., 'assigned', 'delivered')
         }
 
-        const orderItems = await OrderItem.find(query)
+        // Find orders first, then populate their order items
+        const orders = await Order.find(orderQuery)
             .populate({
-                path: 'order_id',
-                model: 'Order',
-                populate: [
-                    {
-                        path: 'user_id',
-                        model: 'User',
-                        select: 'username email mobile'
-                    },
-                    {
-                        path: 'address_id',
-                        model: 'Address'
-                    }
-                ]
-            })
-            .populate({
-                path: 'product_id',
-                model: 'Product',
-                select: 'name images description'
-            })
-               .populate({
-                path: 'product_variant_id',
-                model: 'Product',
-                select: 'variant_name variant_price variant_specialPrice variant_stockStatus variant_isActive '
-            })
-            .populate({
-                path: 'seller_id',
+                path: 'user_id',
                 model: 'User',
-                select: 'username email vendor_details.store_name'
+                select: 'username email mobile'
             })
-            .sort({ date_added: -1 });
+            .populate({
+                path: 'address_id',
+                model: 'Address'
+            })
+            .sort({ 'delivery_info.assigned_at': -1 });
 
-        // Transform the data to a more usable format
-        const formattedOrders = orderItems.map(item => {
-            const order = item.order_id?.toObject() || {};
-            const itemObj = item.toObject();
-            delete itemObj.order_id;
+        // For each order, get its order items
+        const formattedOrders = await Promise.all(orders.map(async (order) => {
+            const orderObj = order.toObject();
             
+            // Find all order items for this order
+            const orderItems = await OrderItem.find({ order_id: order._id })
+                .populate({
+                    path: 'product_id',
+                    model: 'Product',
+                    select: 'name images description'
+                })
+                .populate({
+                    path: 'product_variant_id',
+                    model: 'Product',
+                    select: 'variant_name variant_price variant_specialPrice variant_stockStatus variant_isActive'
+                })
+                .populate({
+                    path: 'seller_id',
+                    model: 'User',
+                    select: 'username email vendor_details.store_name'
+                });
+                console.log("orderItems",orderItems )
+
             return {
-                ...order,
-                delivery_status: item.active_status,
-                delivery_otp: order.delivery_info?.otp,
-                items: [itemObj] // Each order item becomes its own "order" for delivery boy
+                ...orderObj,
+                delivery_status: orderObj.status,
+                delivery_otp: orderObj.delivery_info?.otp,
+                items: orderItems
             };
-        });
+        }));
 
         res.json({
             success: true,

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const brandController = require('../controllers/brandController');
 const {authenticate, authorizePermission} = require('../middleware/authMiddleware');
+const {uploadBrandImages} = require('../middleware/uploadconfig')
 
 // Validation middleware (optional - you can use express-validator or Joi)
 const validateBrand = (req, res, next) => {
@@ -26,7 +27,10 @@ const validateBrand = (req, res, next) => {
 
 // @route   POST /api/brands
 // @desc    Create a new brand
-router.post('/', validateBrand, brandController.createBrand);
+router.post('/', validateBrand,
+   uploadBrandImages.fields([
+    { name: 'icon', maxCount: 1 },
+  ]), brandController.createBrand);
 
 // @route   GET /api/brands
 // @desc    Get all brands with filtering, sorting, and pagination

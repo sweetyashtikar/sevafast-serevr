@@ -558,11 +558,6 @@ const getAllProducts = async (req, res) => {
 
        const total = await Product.countDocuments(query);
 
-    // console.log("products", products)
-    console.log("products.length", products.length)
-
-    // Get total count
-
 
     res.status(200).json({
       success: true,
@@ -705,7 +700,6 @@ const getAllProductsWithFilters = async (req, res) => {
       .skip(skip)
       .limit(parseInt(limit));
 
-    console.log("products", products)
 
     // Get total count
     const total = await Product.countDocuments(query);
