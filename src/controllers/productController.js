@@ -467,7 +467,7 @@ const getProductById = async (req, res) => {
   }
 };
 
-//get all products irrespective of status and isApproved
+//get all products irrespective of status and isApproved for admin
 const getAllProducts = async (req, res) => {
   try {
      const {
@@ -485,16 +485,17 @@ const getAllProducts = async (req, res) => {
       sortOrder = "desc",
       inStock,
       deliverableZipcodes,
-      status, isApproved
+      status, 
+      isApproved
     } = req.query;
     console.log(req.query)
 
     const query = {};
-    if(status){
-        query.status = status;
+    if(status !== undefined && status !== ""){
+        query.status = status === "true";
     }
-      if(isApproved){
-        query.isApproved = isApproved;
+      if(isApproved !== undefined && isApproved !== ""){
+      query.isApproved = isApproved === "true";
     }
 
      // Category filter
@@ -517,7 +518,7 @@ const getAllProducts = async (req, res) => {
     }
 
     // Indicator filter (veg/non-veg)
-    if (indicator !== undefined) {
+    if (indicator !== undefined && indicator !== "") {
       query.indicator = parseInt(indicator);
     }
 
@@ -526,6 +527,17 @@ const getAllProducts = async (req, res) => {
       query.productType = productType;
     }
 
+    if (minPrice || maxPrice) {
+  query.effectivePrice = {};
+  if (minPrice) query.effectivePrice.$gte = parseFloat(minPrice);
+  if (maxPrice) query.effectivePrice.$lte = parseFloat(maxPrice);
+}
+
+    // Add this to your query building
+if (inStock !== undefined && inStock !== "") {
+  query.inStock = inStock === "true";
+}
+
         const sort = {};
     sort[sortBy] = sortOrder === "asc" ? 1 : -1;
 
@@ -533,7 +545,6 @@ const getAllProducts = async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
 
-    console.log("req product", req.query)
 
     // Execute query
     const products = await Product.find(query)
@@ -557,6 +568,7 @@ const getAllProducts = async (req, res) => {
       .limit(parseInt(limit));
 
        const total = await Product.countDocuments(query);
+       console.log("totoal", total)
 
 
     res.status(200).json({
@@ -583,7 +595,7 @@ const getAllProducts = async (req, res) => {
 
 
 // ==========================================
-// GET ALL PRODUCTS (with filters)
+// GET ALL PRODUCTS (with filters) for users /customers
 // ==========================================
 
 const getAllProductsWithFilters = async (req, res) => {

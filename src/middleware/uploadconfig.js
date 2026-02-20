@@ -95,6 +95,15 @@ const brandImageStorage = new CloudinaryStorage({
     }
 });
 
+const CategoryImageStorage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: {
+        folder: 'category_images',
+        allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+        transformation: [{ width: 1500, height: 1500, crop: 'limit', quality: 'auto' }]
+    }
+});
+
 // Cloudinary storage for product videos
 const productVideoStorage = new CloudinaryStorage({
     cloudinary: cloudinary,
@@ -134,6 +143,22 @@ const uploadBrandImages = multer({
         files: 1 // 1 main + 10 other images
     }
 });
+
+// Create multer instance for products
+const uploadCategoryImages = multer({
+    storage: CategoryImageStorage,
+    fileFilter: (req, file, cb) => {
+        if (!file.mimetype.startsWith('image/')) {
+            return cb(new Error('Only image files are allowed'), false);
+        }
+         cb(null, true);
+    },
+    limits: {
+        fileSize: MAX_FILE_SIZE,
+        files: 2 // 1 main + 10 other images
+    }
+});
+
 const uploadProductVideos = multer({
     storage: productVideoStorage,
     fileFilter: (req, file, cb) => {
@@ -154,5 +179,6 @@ module.exports = {
     uploadProductImages,
     ALLOWED_FILE_TYPES,
     MAX_FILE_SIZE,
-    uploadBrandImages
+    uploadBrandImages,
+    uploadCategoryImages
 };

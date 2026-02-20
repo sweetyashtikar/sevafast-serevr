@@ -4,7 +4,9 @@ const Category = require('../models/category');
 const createCategory = async (req, res) => {
     console.log("Request Body:", req.body); 
     try {
-        const { name, sub_category, image, banner, row_order } = req.body;
+        const { name, sub_category, row_order } = req.body;
+        const image = req.files?.image?.[0]?.path; 
+          const banner = req.files?.banner?.[0]?.path; 
 
         // Auto-generate slug from name: "Men's Fashion" -> "mens-fashion"
         const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
@@ -23,6 +25,7 @@ const createCategory = async (req, res) => {
         await newCategory.save();
         res.status(201).json({ success: true, message: 'Category created successfully', data: newCategory });
     } catch (error) {
+        console.log("error", error)
         res.status(400).json({ success: false, message: error.message });
     }
 };

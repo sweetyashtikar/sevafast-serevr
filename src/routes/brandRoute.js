@@ -27,10 +27,9 @@ const validateBrand = (req, res, next) => {
 
 // @route   POST /api/brands
 // @desc    Create a new brand
-router.post('/', validateBrand,
-   uploadBrandImages.fields([
-    { name: 'icon', maxCount: 1 },
-  ]), brandController.createBrand);
+router.post('/', uploadBrandImages.fields([
+  { name: 'icon', maxCount: 1 },
+]), validateBrand, brandController.createBrand);
 
 // @route   GET /api/brands
 // @desc    Get all brands with filtering, sorting, and pagination

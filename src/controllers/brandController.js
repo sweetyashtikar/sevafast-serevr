@@ -5,7 +5,7 @@ const Brand = require('../models/brand');
 // @access  Public/Private (adjust as needed)
 const createBrand = async (req, res) => {
   const { name, status } = req.body;
-    const { icon } = req.files;
+const icon = req.files?.icon?.[0]?.path; 
   console.log("req.body", req.body)
   try {
 
@@ -22,8 +22,9 @@ const createBrand = async (req, res) => {
     const brand = await Brand.create({
       name,
       icon,
-      status: status || 'active'
+     status: status !== undefined ? status : true
     });
+    console.log("brand", brand)
 
     res.status(201).json({
       success: true,
