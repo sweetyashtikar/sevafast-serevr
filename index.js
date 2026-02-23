@@ -41,6 +41,8 @@ const userPermissionRoute = require('./src/routes/userPermissionRoute')
 const tezRoute = require('./src/routes/tezRoute')
 const DeliveryBoyRoute = require('./src/routes/deliveryBoyRoutes')
 const ReturnRequestRoute = require('./src/routes/returnRequestRoute')
+const BannerRoute = require('./src/routes/bannerRoute')
+const CouponRoute = require('./src/routes/couponRoute')
 
 
 
@@ -94,6 +96,8 @@ app.use('/api/viewCart', viewCartRoute)
 app.use('/api/userPermission',userPermissionRoute )
 app.use('/api/delivery_boy',DeliveryBoyRoute)
 app.use('/api/return_request',ReturnRequestRoute)
+app.use('/api/banners',BannerRoute)
+app.use('/api/coupons',CouponRoute)
 
 
 

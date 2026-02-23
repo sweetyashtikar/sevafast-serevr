@@ -103,6 +103,23 @@ const CategoryImageStorage = new CloudinaryStorage({
         transformation: [{ width: 1500, height: 1500, crop: 'limit', quality: 'auto' }]
     }
 });
+const BannerImageStorage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: {
+        folder: 'banner_images',
+        allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+        transformation: [{ width: 1500, height: 1500, crop: 'limit', quality: 'auto' }]
+    }
+});
+
+const couponImageStorage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: {
+        folder: 'coupon_images',
+        allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+        transformation: [{ width: 1500, height: 1500, crop: 'limit', quality: 'auto' }]
+    }
+});
 
 // Cloudinary storage for product videos
 const productVideoStorage = new CloudinaryStorage({
@@ -129,7 +146,7 @@ const uploadProductImages = multer({
     }
 });
 
-// Create multer instance for products
+// Create multer instance for barnd
 const uploadBrandImages = multer({
     storage: brandImageStorage,
     fileFilter: (req, file, cb) => {
@@ -143,6 +160,35 @@ const uploadBrandImages = multer({
         files: 1 // 1 main + 10 other images
     }
 });
+
+// Create multer instance for banner
+const uploadBannerImages = multer({
+    storage: BannerImageStorage,
+    fileFilter: (req, file, cb) => {
+        if (!file.mimetype.startsWith('image/')) {
+            return cb(new Error('Only image files are allowed'), false);
+        }
+        cb(null, true);
+    },
+    limits: {
+        fileSize: MAX_FILE_SIZE
+    }
+});
+
+// Create multer instance for ciupon
+const uploadCouponImages = multer({
+    storage: couponImageStorage,
+    fileFilter: (req, file, cb) => {
+        if (!file.mimetype.startsWith('image/')) {
+            return cb(new Error('Only image files are allowed'), false);
+        }
+        cb(null, true);
+    },
+    limits: {
+        fileSize: MAX_FILE_SIZE
+    }
+});
+
 
 // Create multer instance for products
 const uploadCategoryImages = multer({
@@ -180,5 +226,7 @@ module.exports = {
     ALLOWED_FILE_TYPES,
     MAX_FILE_SIZE,
     uploadBrandImages,
-    uploadCategoryImages
+    uploadCategoryImages,
+    uploadBannerImages,
+    uploadCouponImages
 };
