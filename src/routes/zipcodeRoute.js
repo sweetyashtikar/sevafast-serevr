@@ -9,13 +9,15 @@ const {
     checkZipcodeAvailability,
     updateZipcode,
     deleteZipcode,
-    bulkDeleteZipcodes
+    bulkDeleteZipcodes,
+    getZipcodesByCity
 } = require('../controllers/zipcodeController');
 
 const {pagination} = require('../middleware/pagination')
 
 // Public routes (for checking service availability)
 router.get('/check/:zipcode', checkZipcodeAvailability);
+router.get('/:cityId',getZipcodesByCity )
 
 router.route('/')
     .post(createZipcode)
@@ -28,5 +30,6 @@ router.route('/:id')
 
 router.post('/bulk', bulkCreateZipcodes);
 router.delete('/bulk/delete', bulkDeleteZipcodes);
+
 
 module.exports = router;

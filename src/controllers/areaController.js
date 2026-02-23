@@ -143,6 +143,7 @@ const getAllAreas = async (req, res) => {
             success: true,
             message: 'Areas retrieved successfully',
             data: {
+                areas,
                 pagination: {
                     currentPage: page,
                     totalPages: Math.ceil(total / limit),

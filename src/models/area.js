@@ -21,21 +21,39 @@ const areaSchema = new mongoose.Schema({
         trim: true 
     },
 
+     pincode: {
+        type: String,
+        trim: true,
+        // You might want to keep this for faster queries without populating
+    },
+
     // Delivery Logic (Critical for Checkout)
     minimum_free_delivery_order_amount: { 
-        type: String, 
+        type: Number, 
         default: 100 
     },
     
     delivery_charges: { 
-        type: String, 
+        type: Number, 
         default: 0 
+    },
+
+        // Delivery time estimate (useful for checkout)
+    estimated_delivery_days: {
+        type: Number,
+        default: 2,
+        min: 1
     },
 
     // Status to enable/disable delivery to specific areas
     active: { 
         type: Boolean, 
         default: true 
+    },
+    // For pickup locations vs delivery
+    is_deliverable: {
+        type: Boolean,
+        default: true
     }
 }, { 
     timestamps: true 
