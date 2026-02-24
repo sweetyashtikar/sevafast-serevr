@@ -449,46 +449,49 @@ const bulkCreateZipcodes = async (req, res) => {
 
 // 3. READ - Get all zipcodes (with pagination)
 const getAllZipcodes = async (req, res) => {
+  try {
     const { limit, offset, sort, searchQuery, filters } = req.paginationQuery;
-    
-    try {
-        const finalQuery = { ...searchQuery, ...filters };
 
-        // Get total count for pagination
-        const total = await Zipcode.countDocuments(finalQuery);
+    // Safety defaults
+    const safeLimit = parseInt(limit) || 10;
+    const safeOffset = parseInt(offset) || 0;
 
-        // Get paginated results with city details
-        const zipcodes = await Zipcode.find(finalQuery)
-            .populate('city_id', 'name') // Populate city name
-            .sort(sort)
-            .skip(offset)
-            .limit(limit)
-            .lean();
-        
-        const currentPage = Math.floor(offset / limit) + 1;
+    const finalQuery = { ...searchQuery, ...filters };
 
-        res.status(200).json({
-            success: true,
-            message: 'Zipcodes retrieved successfully',
-            data: {
-                zipcodes,
-                pagination: {
-                    currentPage,
-                    totalPages: Math.ceil(total / limit),
-                    totalItems: total,
-                    itemsPerPage: limit,
-                    hasNextPage: offset + limit < total,
-                    hasPreviousPage: offset > 0
-                }
-            }
-        });
-    } catch (error) {
-        console.error('Error fetching zipcodes:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to fetch zipcodes'
-        });
-    }
+    // Total Count
+    const total = await Zipcode.countDocuments(finalQuery);
+
+    // Fetch Data
+    const zipcodes = await Zipcode.find(finalQuery)
+        .populate('city_id', 'name')
+      .sort(sort || { createdAt: -1 })
+      .skip(safeOffset)
+      .limit(safeLimit)
+      .lean();
+
+    // Correct Current Page
+    const currentPage = Math.floor(safeOffset / safeLimit) + 1;
+
+    res.status(200).json({
+      success: true,
+      message: "Zipcodes retrieved successfully",
+      zipcodes, 
+      pagination: {
+        currentPage,
+        totalPages: Math.ceil(total / safeLimit),
+        totalItems: total,
+        itemsPerPage: safeLimit,
+        hasNextPage: safeOffset + safeLimit < total,
+        hasPreviousPage: safeOffset > 0,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching zipcodes:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch zipcodes",
+    });
+  }
 };
 
 // 4. READ - Get single zipcode by ID
@@ -732,6 +735,43 @@ const getZipcodesByCity = async (req, res) => {
     }
 };
 
+// 10. READ - Check if zipcode has delivery true (for service availability)
+const checkZipcodeAvailabilityTrue = async (req, res) => {
+    try {
+        // Find all zipcodes where is_deliverable is true
+        const zipcodeDocs = await Zipcode.find({ 
+            is_deliverable: true 
+        }).populate('city_id', 'name');
+
+        // Check if any zipcodes were found
+        const hasDeliverableZipcodes = zipcodeDocs && zipcodeDocs.length > 0;
+
+        res.status(200).json({
+            success: true,
+            message: hasDeliverableZipcodes 
+                ? 'Deliverable zipcodes found' 
+                : 'No deliverable zipcodes found',
+            data: {
+                count: zipcodeDocs.length,
+                zipcodes: zipcodeDocs.map(zip => ({
+                    _id: zip._id,
+                    zipcode: zip.zipcode,
+                    city: zip.city_id,
+                    is_deliverable: zip.is_deliverable
+                })),
+                isServiceable: hasDeliverableZipcodes
+            }
+        });
+    } catch (error) {
+        console.error('Error checking zipcodes:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to check zipcode availability',
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
     createZipcode,
     bulkCreateZipcodes,
@@ -741,5 +781,6 @@ module.exports = {
     updateZipcode,
     deleteZipcode,
     bulkDeleteZipcodes,
-    getZipcodesByCity // New export
+    getZipcodesByCity ,
+    checkZipcodeAvailabilityTrue
 };

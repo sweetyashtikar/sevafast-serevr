@@ -53,6 +53,7 @@ const addProduct = async (req, res) => {
 
     let mainImageUrl = '';
     let otherImageUrls = [];
+    console.log("req.files", req.files)
 
     if (req.files) {
       if (req.files.mainImage && req.files.mainImage[0]) {
@@ -71,7 +72,7 @@ const addProduct = async (req, res) => {
       dimensions: body.dimensions ? JSON.parse(body.dimensions) : {},
       video: body.video ? JSON.parse(body.video) : {},
       productLevelStock: body.productLevelStock ? JSON.parse(body.productLevelStock) : {},
-      variants: body.variants ? JSON.parse(body.variants) : [],
+      //  variants: body.variants,
       tags: body.tags ? JSON.parse(body.tags) : [],
       attributeValues: body.attributeValues ? JSON.parse(body.attributeValues) : [],
       deliverableZipcodes: body.deliverableZipcodes ? JSON.parse(body.deliverableZipcodes) : [],
@@ -81,6 +82,7 @@ const addProduct = async (req, res) => {
       checkStatus(Tax, body.taxId)
     ]);
     if (body.productType === PRODUCT_TYPES.VARIABLE) {
+      // productData.variants = buildVariants(body, parseInt, parseFloat, files);
       const validateAtrributeValue = await checkStatus(AttributeValue, parsedBody.attributeValues);
       if (!validateAtrributeValue) {
         return res.status(400).json({
@@ -134,7 +136,8 @@ const addProduct = async (req, res) => {
       status: parsedBody.status === undefined ? true : parsedBody.status,
     };
 
-    addProductTypeData(productData, parsedBody,toInt, toFloat,toArray);
+    // addProductTypeData(productData, parsedBody,toInt, toFloat,toArray);
+addProductTypeData(productData, parsedBody, toInt, toFloat, toArray, req.files);
 
     const product = new Product(productData);
     console.log("New Product Data:", product);

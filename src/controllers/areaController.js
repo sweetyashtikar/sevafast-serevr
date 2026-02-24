@@ -18,13 +18,13 @@ const createArea = async (req, res) => {
             delivery_charges
         } = req.body;
         
-        // // Validate required fields
-        // if (!city_id || !name) {
-        //     return res.status(400).json({
-        //         success: false,
-        //         message: 'City ID and Area name are required'
-        //     });
-        // }
+        // Validate required fields
+        if (!city_id || !name) {
+            return res.status(400).json({
+                success: false,
+                message: 'City ID and Area name are required'
+            });
+        }
 
         // Check if city exists
         const cityExists = await City.findById(city_id);
@@ -107,8 +107,8 @@ const getAllAreas = async (req, res) => {
         }
         
         // Filter by active status
-        if (req.query.active !== undefined) {
-            query.active = req.query.active === 'true';
+        if (req.query.status !== undefined) {
+            query.status = req.query.status === 'true';
         }
         
         // Search by area name
@@ -154,7 +154,7 @@ const getAllAreas = async (req, res) => {
                 },
                 summary: {
                     total_areas: total,
-                    active_areas: await Area.countDocuments({ ...query, active: true }),
+                    active_areas: await Area.countDocuments({ ...query, status: true }),
                     areas_with_delivery_charges: await Area.countDocuments({ ...query, delivery_charges: { $gt: 0 } })
                 }
             }
@@ -215,8 +215,8 @@ const getAreasByCity = async (req, res) => {
         }
         
         // Get only active areas by default (for checkout/delivery purposes)
-        const activeOnly = req.query.active_only !== 'false';
-        let query = { city_id, active: true };
+        const activeOnly = req.query.status_only !== 'false';
+        let query = { city_id, status: true };
         
         if (!activeOnly) {
             query = { city_id };
@@ -224,7 +224,7 @@ const getAreasByCity = async (req, res) => {
         
         const areas = await Area.find(query)
             .populate('zipcode_id', 'zipcode')
-            .select('name delivery_charges minimum_free_delivery_order_amount active')
+            .select('name delivery_charges minimum_free_delivery_order_amount status')
             .sort({ name: 1 })
             .lean();
         
@@ -242,12 +242,12 @@ const getAreasByCity = async (req, res) => {
                     name: area.name,
                     delivery_charges: area.delivery_charges,
                     minimum_order_for_free_delivery: area.minimum_free_delivery_order_amount,
-                    is_active: area.active,
+                    is_active: area.status,
                     zipcode: area.zipcode_id?.zipcode || null
                 })),
                 summary: {
                     total_areas: areas.length,
-                    serviceable_areas: areas.filter(a => a.active).length,
+                    serviceable_areas: areas.filter(a => a.status).length,
                     average_delivery_charge: areas.length > 0 
                         ? areas.reduce((sum, a) => sum + a.delivery_charges, 0) / areas.length 
                         : 0
@@ -382,7 +382,7 @@ const toggleAreaStatus = async (req, res) => {
         // Toggle active status
         const updatedArea = await Area.findByIdAndUpdate(
             id,
-            { active: !area.active, updatedAt: Date.now() },
+            { status: !area.status, updatedAt: Date.now() },
             { new: true }
         )
         .populate('city_id', 'name')
@@ -390,12 +390,12 @@ const toggleAreaStatus = async (req, res) => {
         
         res.status(200).json({
             success: true,
-            message: `Area ${updatedArea.active ? 'activated' : 'deactivated'} successfully`,
+            message: `Area ${updatedArea.status ? 'activated' : 'deactivated'} successfully`,
             data: {
                 id: updatedArea._id,
                 name: updatedArea.name,
                 city: updatedArea.city_id.name,
-                active: updatedArea.active,
+                status: updatedArea.status,
                 status_changed_at: updatedArea.updatedAt
             }
         });
@@ -479,7 +479,7 @@ const calculateDeliveryCharges = async (req, res) => {
             });
         }
         
-        if (!area.active) {
+        if (!area.status) {
             return res.status(400).json({
                 success: false,
                 message: 'Delivery not available in this area',
@@ -520,7 +520,7 @@ const calculateDeliveryCharges = async (req, res) => {
                     is_free_delivery: isFreeDelivery,
                     total_payable: totalAmount
                 },
-                serviceable: area.active
+                serviceable: area.status
             }
         });
     } catch (error) {

@@ -4,33 +4,59 @@ const { ObjectId } = require("mongodb");
 // @desc    Get all cities (with pagination, search, sort)
 const getCities = async (req, res) => {
   try {
-    const { limit, offset, sort, searchQuery, filters } = req.paginationQuery;
-    const finalQuery = { ...searchQuery, ...filters };
+    // 1️⃣ Query Params
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const search = req.query.search || "";
 
-    const cities = await City.find(finalQuery)
-      .sort(sort)
+    const sortField = req.query.sortField || "createdAt";
+    const sortOrder = req.query.sortOrder === "asc" ? 1 : -1;
+
+    // 2️⃣ Offset Calculate
+    const offset = (page - 1) * limit;
+
+    // 3️⃣ Search Query
+    let query = {};
+    if (search) {
+      query.name = { $regex: search, $options: "i" };
+    }
+
+    // 4️⃣ Fetch Data
+    const cities = await City.find(query)
+      .sort({ [sortField]: sortOrder })
       .limit(limit)
       .skip(offset);
 
-    const total = await City.countDocuments(finalQuery);
+    const total = await City.countDocuments(query);
 
+    // 5️⃣ Total Pages
+    const totalPages = Math.ceil(total / limit);
+
+    // 6️⃣ Final Response (Frontend Friendly)
     res.status(200).json({
       success: true,
-      total,
-      limit,
-      offset,
-      count: cities.length,
       cities,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalItems: total,
+      },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error("Get Cities Error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 
 const getcityById = async (req, res) => {
   const id = req.params.id;
+  console.log("city id", id)
   try {
-    const city = await City.find(id);
+    const city = await City.findOne({_id : id});
+    console.log("city", city)
     if (!city)  return res.status(404).json({ success: false, message: "city not found" });
     res.status(200).json({ success: true, data: city });
   } catch (error) {
@@ -42,7 +68,7 @@ const getcityById = async (req, res) => {
 const createCity = async (req, res) => {
   try {
     const city = await City.create(req.body);
-    res.status(201).json({ success: true, data: city });
+    res.status(201).json({ success: true, message : "city created successfully",data: city });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
   }

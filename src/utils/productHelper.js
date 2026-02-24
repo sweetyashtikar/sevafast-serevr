@@ -121,7 +121,7 @@ function mapSEO(body){
   };
 }
 
-function addProductTypeData(productData, body, toInt, toFloat) {
+function addProductTypeData(productData, body, toInt, toFloat, toArray, files) {
   const { productType } = body;
 
   // Simple Product
@@ -160,7 +160,7 @@ function addProductTypeData(productData, body, toInt, toFloat) {
 
   // Variable Product
   if (productType === PRODUCT_TYPES.VARIABLE) {
-    productData.variants = buildVariants(body, toInt, toFloat);
+    productData.variants = buildVariants(body, toInt, toFloat, files);
 
     delete productData.simpleProduct;
 
@@ -178,67 +178,190 @@ function addProductTypeData(productData, body, toInt, toFloat) {
   }
 }
 
-function buildVariants(body, toInt, toFloat) {
-  // If variants are sent as an array of objects
-  if (body.variants && Array.isArray(body.variants)) {
-    return body.variants.map((variantData) => {
-      const variant = {
-        variant_name: variantData.variant_name,
-        variant_price: toFloat(variantData.variant_price || variantData.price),
-        variant_specialPrice: variantData.variant_specialPrice || variantData.special_price ? toFloat(variantData.variant_specialPrice || variantData.special_price): undefined,
+// function buildVariants(body, toInt, toFloat,files) {
 
-        // Stock management
-        variant_sku: variantData.variant_sku || variantData.sku || "",
-        variant_totalStock:variantData.variant_totalStock || variantData.stock_quantity ? toInt(variantData.variant_totalStock || variantData.stock_quantity) : 0,
-        variant_stockStatus:
-          variantData.variant_stockStatus ||
-          variantData.stock_status ||
-          STOCK_STATUS.IN_STOCK,
+//   // Parse the mapping if it exists
+//   let imageMapping = [];
+//    if (body.variant_image_mapping) {
+//     try {
+//       imageMapping = JSON.parse(body.variant_image_mapping);
+//     } catch (e) {
+//       console.error('Error parsing variant_image_mapping:', e);
+//     }
+//   }
+  
+//   // Get uploaded variant images
+//   const uploadedVariantImages = files?.variant_images || [];
+  
+//   // Create a map of imageId to file path
+//   const imagePathMap = {};
+//   uploadedVariantImages.forEach((file, index) => {
+//     // The filename contains the imageId we set in the frontend
+//     const imageId = file.originalname;
+//     imagePathMap[imageId] = file.path;
+//   });
 
-        // Dimensions
-        variant_weight:
-          variantData.variant_weight || variantData.weight
-            ? toFloat(variantData.variant_weight || variantData.weight)
-            : undefined,
-        variant_height:
-          variantData.variant_height || variantData.height
-            ? toFloat(variantData.variant_height || variantData.height)
-            : undefined,
-        variant_breadth:
-          variantData.variant_breadth || variantData.breadth
-            ? toFloat(variantData.variant_breadth || variantData.breadth)
-            : undefined,
-        variant_length:
-          variantData.variant_length || variantData.length
-            ? toFloat(variantData.variant_length || variantData.length)
-            : undefined,
+//   // If variants are sent as an array of objects
+//   if (body.variants && Array.isArray(body.variants)) {
+//     return body.variants.map((variantData) => {
+//       const variant = {
+//         variant_name: variantData.variant_name,
+//         variant_price: toFloat(variantData.variant_price || variantData.price),
+//         variant_specialPrice: variantData.variant_specialPrice || variantData.special_price ? toFloat(variantData.variant_specialPrice || variantData.special_price): undefined,
 
-        // Images
-        variant_images: variantData.variant_images
-          ? Array.isArray(variantData.variant_images)
-            ? variantData.variant_images
-            : variantData.variant_images
-                .split(",")
-                .map((img) => img.trim())
-                .filter((img) => img)
-          : [],
+//         // Stock management
+//         variant_sku: variantData.variant_sku || variantData.sku || "",
+//         variant_totalStock:variantData.variant_totalStock || variantData.stock_quantity ? toInt(variantData.variant_totalStock || variantData.stock_quantity) : 0,
+//         variant_stockStatus:
+//           variantData.variant_stockStatus ||
+//           variantData.stock_status ||
+//           STOCK_STATUS.IN_STOCK,
 
-        // Status
-        variant_isActive:
-          variantData.variant_isActive !== undefined
-            ? variantData.variant_isActive
-            : true,
-      };
+//         // Dimensions
+//         variant_weight:
+//           variantData.variant_weight || variantData.weight
+//             ? toFloat(variantData.variant_weight || variantData.weight)
+//             : undefined,
+//         variant_height:
+//           variantData.variant_height || variantData.height
+//             ? toFloat(variantData.variant_height || variantData.height)
+//             : undefined,
+//         variant_breadth:
+//           variantData.variant_breadth || variantData.breadth
+//             ? toFloat(variantData.variant_breadth || variantData.breadth)
+//             : undefined,
+//         variant_length:
+//           variantData.variant_length || variantData.length
+//             ? toFloat(variantData.variant_length || variantData.length)
+//             : undefined,
 
-      return variant;
-    });
-  }
+//         // Images
+//         variant_images: variantData.variant_images
+//           ? Array.isArray(variantData.variant_images)
+//             ? variantData.variant_images
+//             : variantData.variant_images
+//                 .split(",")
+//                 .map((img) => img.trim())
+//                 .filter((img) => img)
+//           : [],
 
-  // No variants provided
-  return [];
-}
+//         // Status
+//         variant_isActive:
+//           variantData.variant_isActive !== undefined
+//             ? variantData.variant_isActive
+//             : true,
+//       };
+
+//       return variant;
+//     });
+//   }
+
+//   // No variants provided
+//   return [];
+// }
 
 //helper function for updating product
+
+function buildVariants(body, toInt, toFloat, files) {
+  // Parse the mapping if it exists
+  let imageMapping = [];
+  if (body.variant_image_mapping) {
+    try {
+      imageMapping = JSON.parse(body.variant_image_mapping);
+    } catch (e) {
+      console.error('Error parsing variant_image_mapping:', e);
+    }
+  }
+  
+  // Get uploaded variant images
+  const uploadedVariantImages = files?.variant_images || [];
+  
+  // Create a map of imageId to file path
+  const imagePathMap = {};
+  uploadedVariantImages.forEach((file) => {
+    const imageId = file.originalname;
+    imagePathMap[imageId] = file.path;
+  });
+  
+  // Handle variants - could be string, array of strings, or parsed array
+  let variantsArray = [];
+  
+  if (body.variants) {
+    // Case 1: It's already an array of objects (parsed)
+    if (Array.isArray(body.variants) && body.variants.length > 0 && typeof body.variants[0] === 'object') {
+      variantsArray = body.variants;
+    }
+    // Case 2: It's a single JSON string
+    else if (typeof body.variants === 'string') {
+      try {
+        variantsArray = JSON.parse(body.variants);
+      } catch (e) {
+        console.error('Error parsing variants string:', e);
+      }
+    }
+    // Case 3: It's an array of JSON strings (your current case)
+    else if (Array.isArray(body.variants)) {
+      // Try to parse each item in the array
+      try {
+        // If the array has one item that contains all variants
+        if (body.variants.length === 1) {
+          variantsArray = JSON.parse(body.variants[0]);
+        } else {
+          // If multiple items, they might be separate variants
+          // But in your case, it looks like the first item has all data
+          // and the second is empty/duplicate
+          variantsArray = JSON.parse(body.variants[0]);
+        }
+      } catch (e) {
+        console.error('Error parsing variants array item:', e);
+      }
+    }
+  }
+  
+  // Ensure we have an array
+  if (!Array.isArray(variantsArray)) {
+    variantsArray = [];
+  }
+  
+  // Process each variant
+  return variantsArray.map((variantData, variantIndex) => {
+    // Find all images for this variant from the mapping
+    const variantImages = imageMapping
+      .filter(mapping => mapping.variantIndex === variantIndex)
+      .map(mapping => imagePathMap[mapping.imageId])
+      .filter(path => path); // Remove any undefined
+    
+    // Clean up variant_images_previews from the data
+    const { variant_images_previews, ...cleanVariantData } = variantData;
+    
+    const variant = {
+      variant_name: cleanVariantData.variant_name,
+      variant_price: toFloat(cleanVariantData.variant_price || cleanVariantData.price),
+      variant_specialPrice: cleanVariantData.variant_specialPrice || cleanVariantData.special_price ? toFloat(cleanVariantData.variant_specialPrice || cleanVariantData.special_price) : undefined,
+
+      // Stock management
+      variant_sku: cleanVariantData.variant_sku || cleanVariantData.sku || "",
+      variant_totalStock: cleanVariantData.variant_totalStock || cleanVariantData.stock_quantity ? toInt(cleanVariantData.variant_totalStock || cleanVariantData.stock_quantity) : 0,
+      variant_stockStatus: cleanVariantData.variant_stockStatus || cleanVariantData.stock_status || STOCK_STATUS.IN_STOCK,
+
+      // Dimensions
+      variant_weight: cleanVariantData.variant_weight || cleanVariantData.weight ? toFloat(cleanVariantData.variant_weight || cleanVariantData.weight) : undefined,
+      variant_height: cleanVariantData.variant_height || cleanVariantData.height ? toFloat(cleanVariantData.variant_height || cleanVariantData.height) : undefined,
+      variant_breadth: cleanVariantData.variant_breadth || cleanVariantData.breadth ? toFloat(cleanVariantData.variant_breadth || cleanVariantData.breadth) : undefined,
+      variant_length: cleanVariantData.variant_length || cleanVariantData.length ? toFloat(cleanVariantData.variant_length || cleanVariantData.length) : undefined,
+
+      // Images - use the mapped images
+      variant_images: variantImages,
+
+      // Status
+      variant_isActive: cleanVariantData.variant_isActive !== undefined ? cleanVariantData.variant_isActive : true,
+    };
+
+    return variant;
+  });
+}
+
+
 const shouldUpdate = (val) => val !== undefined && val !== null && val !== "";
 
 // Update functions

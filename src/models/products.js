@@ -550,7 +550,7 @@ productSchema.virtual("inStock").get(function () {
       return this.productLevelStock?.pls_stockStatus === STOCK_STATUS.IN_STOCK;
     }
     // Check if any variant is in stock
-    return this.variants?.some((v) => v.stockStatus === STOCK_STATUS.IN_STOCK) || false;
+    return this.variants?.some((v) => v.variant_stockStatus === STOCK_STATUS.IN_STOCK) || false;
   }
   // Digital products - you said they should always be "in stock"
   if (this.productType === PRODUCT_TYPES.DIGITAL) {

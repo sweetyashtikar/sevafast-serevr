@@ -97,7 +97,8 @@ router.post(
   authorizePermission("can_manage_products"),
   uploadProductImages.fields([
     { name: 'mainImage', maxCount: 1 },
-    { name: 'otherImages', maxCount: 10 }
+    { name: 'otherImages', maxCount: 10 },
+    { name: 'variant_images', maxCount: 50 },
   ]),
   productController.addProduct
 );

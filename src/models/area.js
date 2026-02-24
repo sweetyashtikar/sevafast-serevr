@@ -46,7 +46,7 @@ const areaSchema = new mongoose.Schema({
     },
 
     // Status to enable/disable delivery to specific areas
-    active: { 
+    status: { 
         type: Boolean, 
         default: true 
     },

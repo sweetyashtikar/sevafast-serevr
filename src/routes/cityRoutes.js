@@ -4,6 +4,7 @@ const cityController = require('../controllers/cityController');
 const {pagination} = require('../middleware/pagination'); // The middleware we made
 
 router.post('/bulk-city', cityController.uploadBulkCities)
+
 router.route('/')
     .get(pagination, cityController.getCities)
     .post(cityController.createCity);

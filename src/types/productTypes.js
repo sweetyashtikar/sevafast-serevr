@@ -28,7 +28,7 @@ const CANCELABLE_STAGES = {
   RECEIVED: "received",
   PROCESSED: "processed",
   SHIPPED: "shipped",
-  NOT_RETURNABLE :"non returnable"
+  NOT_RETURNABLE :"not_returnable"
 };
 
 const VIDEO_TYPES = {

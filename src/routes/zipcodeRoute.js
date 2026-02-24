@@ -10,14 +10,17 @@ const {
     updateZipcode,
     deleteZipcode,
     bulkDeleteZipcodes,
-    getZipcodesByCity
+    getZipcodesByCity,
+    checkZipcodeAvailabilityTrue
 } = require('../controllers/zipcodeController');
 
 const {pagination} = require('../middleware/pagination')
 
+router.get('/check/delivery-true', checkZipcodeAvailabilityTrue)
 // Public routes (for checking service availability)
 router.get('/check/:zipcode', checkZipcodeAvailability);
 router.get('/:cityId',getZipcodesByCity )
+
 
 router.route('/')
     .post(createZipcode)
