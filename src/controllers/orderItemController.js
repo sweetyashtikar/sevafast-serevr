@@ -331,12 +331,16 @@ const createOrderItem = async (req, res) => {
         // Update product stock (important!)
         for (const item of itemsWithDetails) {
             const product = await Product.findById(item.product_id).session(session);
+  const itemTotalRevenue = item.price * item.quantity;
 
-            if (product.productType === PRODUCT_TYPES.SIMPLE) {
+            if (product.productType === PRODUCT_TYPES.SIMPLE|| product.productType === PRODUCT_TYPES.DIGITAL) {
                 product.simpleProduct.sp_totalStock -= item.quantity;
                 if (product.simpleProduct.sp_totalStock <= 0) {
                     product.simpleProduct.sp_stockStatus = STOCK_STATUS.OUT_OF_STOCK;
                 }
+                  // Update analytics for simple/digital products
+                product.totalSales += item.quantity;
+                product.totalRevenue += itemTotalRevenue;
             } else if (product.productType === PRODUCT_TYPES.VARIABLE) {
                 const variant = product.variants.id(item.product_variant_id);
                 if (variant) {
@@ -344,6 +348,13 @@ const createOrderItem = async (req, res) => {
                     if (variant.variant_totalStock <= 0) {
                         variant.variant_stockStatus = STOCK_STATUS.OUT_OF_STOCK;
                     }
+                     // Update analytics for variant
+                    variant.variant_totalSales += item.quantity;
+                    variant.variant_totalRevenue += itemTotalRevenue;
+                    
+                    // Update product-level analytics (aggregate of all variants)
+                    product.totalSales += item.quantity;
+                    product.totalRevenue += itemTotalRevenue;
                 }
             }
 

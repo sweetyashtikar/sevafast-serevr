@@ -69,6 +69,15 @@ const variantSchema = new mongoose.Schema(
         trim: true,
       },
     ],
+    
+    variant_totalSales :{
+      type: Number,
+      default: 0,
+    },
+    variant_totalRevenue :{
+      type: Number,
+      default: 0,
+    },
 
     // Status
     variant_isActive: {
