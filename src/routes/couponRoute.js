@@ -5,6 +5,7 @@ const { body } = require('express-validator');
 const couponController = require('../controllers/couponController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 const {uploadCouponImages} = require('../middleware/uploadconfig');
+const {authenticate} = require('../middleware/authMiddleware')
 
 // ==================== VALIDATION RULES ====================
 
@@ -154,7 +155,7 @@ router.post('/bulk-delete', couponController.BulkCoupondelete);
 
 router.patch('/bulk-status', couponController.BulkCouponStatus);
 
-router.post('/validate-cart', couponController.validateCouponForCart);
+router.post('/validate-cart', authenticate , couponController.validateCouponForCart);
 
 
 module.exports = router;

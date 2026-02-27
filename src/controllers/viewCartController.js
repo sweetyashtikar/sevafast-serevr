@@ -9,20 +9,187 @@ const { PRODUCT_TYPES, STOCK_STATUS } = require('../types/productTypes');
 /**
  * Get user's cart with product details
  */
+// const getCart = async (req, res) => {
+//     try {
+//         const userId = req.user._id;
+
+//         // Get cart and populate product details
+//         const cart = await Cart.findOne({ userId })
+//             .populate({
+//                 path: 'items.product',
+//                 select: 'name price productType status isApproved isDeleted mainImage otherImages variants simpleProduct vendorId',
+//                 populate: {
+//                     path: 'vendorId',
+//                     select: 'name email businessName'
+//                 }
+//             })
+
+//         if (!cart) {
+//             return res.status(200).json({
+//                 success: true,
+//                 message: 'Cart is empty',
+//                 data: {
+//                     items: [],
+//                     summary: {
+//                         totalItems: 0,
+//                         totalPrice: 0,
+//                         totalDiscount: 0,
+//                         deliveryCharge: 0,
+//                         finalTotal: 0
+//                     }
+//                 }
+//             });
+//         }
+
+//         // Process items with detailed information
+//         const processedItems = await Promise.all(cart.items.map(async (item) => {
+//             const product = item.product;
+
+//             if (!product || product.isDeleted || !product.isApproved || !product.status) {
+//                 return {
+//                     ...item,
+//                     product: null,
+//                     available: false,
+//                     message: 'Product not available'
+//                 };
+//             }
+
+//             let price = 0;
+//             let variant = null;
+//             let stockInfo = null;
+//             let maxQty = 0;
+//             let available = true;
+//             let message = '';
+
+//             if (product.productType === PRODUCT_TYPES.SIMPLE) {
+//                 price = product.simpleProduct.sp_specialPrice || product.simpleProduct.sp_price;
+//                 maxQty = product.simpleProduct.sp_totalStock;
+
+//                 if (product.simpleProduct.sp_stockStatus !== STOCK_STATUS.IN_STOCK) {
+//                     available = false;
+//                     message = 'Out of stock';
+//                 } else if (maxQty < item.qty) {
+//                     available = false;
+//                     message = `Only ${maxQty} items available`;
+//                 }
+//             }
+//             else if (product.productType === PRODUCT_TYPES.VARIABLE) {
+//                 if (!item.variantId) {
+//                     available = false;
+//                     message = 'Variant not selected';
+//                 } else {
+//                     variant = product.variants.id(item.variantId);
+//                     if (!variant || !variant.variant_isActive) {
+//                         available = false;
+//                         message = 'Variant not available';
+//                     } else {
+//                         price = variant.variant_specialPrice || variant.variant_price;
+//                         maxQty = variant.variant_totalStock;
+
+//                         if (variant.variant_stockStatus !== STOCK_STATUS.IN_STOCK) {
+//                             available = false;
+//                             message = 'Variant out of stock';
+//                         } else if (maxQty < item.qty) {
+//                             available = false;
+//                             message = `Only ${maxQty} items available for this variant`;
+//                         }
+//                     }
+//                 }
+//             }
+
+//             const itemTotal = price * item.qty;
+
+//             return {
+//                 _id: item._id,
+//                 product: {
+//                     _id: product._id,
+//                     name: product.name,
+//                     mainImages: product.mainImage,
+//                     productType: product.productType,
+//                     vendor: product.vendorId
+//                 },
+//                 variant: variant ? {
+//                     _id: variant._id,
+//                       variant_price: variant.variant_price,
+//                     variant_specialPrice: variant.variant_specialPrice,
+//                     variant_isActive: variant.variant_isActive,
+//                     variant_stockStatus: variant.variant_stockStatus,
+//                      variant_images: variant.variant_images || [],
+//                       variant_dimensions: {
+//                     variant_weight: variant.variant_weight,
+//                     height: variant.variant_height,
+//                     breadth: variant.variant_breadth,
+//                     length: variant.variant_length
+//                 },
+//                     variant_name: variant.variant_name,
+//                     variant_sku: variant.variant_sku,
+//                     attributes: variant.variant_attributes
+//                 } : null,
+//                 qty: item.qty,
+//                 price,
+//                 itemTotal,
+//                 available,
+//                 maxQty,
+//                 message,
+//                 inStock: available
+//             };
+//         }));
+
+//         // Filter out unavailable items (optional)
+//         const availableItems = processedItems.filter(item => item.available);
+
+//         // Calculate cart summary
+//         const summary = calculateCartSummary(availableItems);
+
+//         // Update cart if there are unavailable items
+//         if (availableItems.length !== cart.items.length) {
+//             // Remove unavailable items from cart
+//             const updatedItems = cart.items.filter((item, index) => {
+//                 return processedItems[index].available;
+//             });
+
+//             await Cart.findOneAndUpdate(
+//                 { userId },
+//                 { items: updatedItems },
+//                 { new: true }
+//             );
+//         }
+
+//         res.status(200).json({
+//             success: true,
+//             message: 'Cart retrieved successfully',
+//             data: {
+//                 items: availableItems,
+//                 summary,
+//                 unavailableItems: processedItems.filter(item => !item.available)
+//             }
+//         });
+
+//     } catch (error) {
+//         console.error('Get cart error:', error);
+//         res.status(500).json({
+//             success: false,
+//             message: 'Failed to retrieve cart',
+//             error: error.message
+//         });
+//     }
+// }
+
+// controllers/cartController.js
 const getCart = async (req, res) => {
     try {
         const userId = req.user._id;
 
-        // Get cart and populate product details
+        // Get cart and populate product details with vendor info
         const cart = await Cart.findOne({ userId })
             .populate({
                 path: 'items.product',
-                select: 'name price productType status isApproved isDeleted mainImage otherImages variants simpleProduct vendorId',
+                select: 'name productType status isApproved isDeleted mainImage otherImages simpleProduct variants vendorId productLevelStock',
                 populate: {
                     path: 'vendorId',
                     select: 'name email businessName'
                 }
-            })
+            });
 
         if (!cart) {
             return res.status(200).json({
@@ -32,28 +199,20 @@ const getCart = async (req, res) => {
                     items: [],
                     summary: {
                         totalItems: 0,
-                        totalPrice: 0,
+                        totalAmount: 0,
                         totalDiscount: 0,
                         deliveryCharge: 0,
-                        finalTotal: 0
-                    }
+                        finalTotal: 0,
+                        itemCount: 0
+                    },
+                    unavailableItems: []
                 }
             });
         }
 
-        // Process items with detailed information
+        // Process items with detailed information and price calculation
         const processedItems = await Promise.all(cart.items.map(async (item) => {
             const product = item.product;
-
-            if (!product || product.isDeleted || !product.isApproved || !product.status) {
-                return {
-                    ...item,
-                    product: null,
-                    available: false,
-                    message: 'Product not available'
-                };
-            }
-
             let price = 0;
             let variant = null;
             let stockInfo = null;
@@ -61,11 +220,32 @@ const getCart = async (req, res) => {
             let available = true;
             let message = '';
 
-            if (product.productType === PRODUCT_TYPES.SIMPLE) {
-                price = product.simpleProduct.sp_specialPrice || product.simpleProduct.sp_price;
-                maxQty = product.simpleProduct.sp_totalStock;
+            // Check if product exists and is available
+            if (!product || product.isDeleted || !product.isApproved || !product.status) {
+                return {
+                    _id: item._id,
+                    product: null,
+                    variant: null,
+                    qty: item.qty,
+                    price: 0,
+                    itemTotal: 0,
+                    available: false,
+                    maxQty: 0,
+                    message: 'Product not available',
+                    inStock: false
+                };
+            }
 
-                if (product.simpleProduct.sp_stockStatus !== STOCK_STATUS.IN_STOCK) {
+            // Handle different product types
+            if (product.productType === PRODUCT_TYPES.SIMPLE) {
+                // Simple product price calculation
+                price = product.simpleProduct?.sp_specialPrice || 
+                        product.simpleProduct?.sp_price || 
+                        product.productLevelStock?.pls_price ||
+                        0;
+                maxQty = product.simpleProduct?.sp_totalStock || 0;
+
+                if (product.simpleProduct?.sp_stockStatus !== STOCK_STATUS.IN_STOCK) {
                     available = false;
                     message = 'Out of stock';
                 } else if (maxQty < item.qty) {
@@ -74,17 +254,18 @@ const getCart = async (req, res) => {
                 }
             }
             else if (product.productType === PRODUCT_TYPES.VARIABLE) {
+                // Variable product with variant
                 if (!item.variantId) {
                     available = false;
                     message = 'Variant not selected';
                 } else {
-                    variant = product.variants.id(item.variantId);
+                    variant = product.variants?.id(item.variantId);
                     if (!variant || !variant.variant_isActive) {
                         available = false;
                         message = 'Variant not available';
                     } else {
-                        price = variant.variant_specialPrice || variant.variant_price;
-                        maxQty = variant.variant_totalStock;
+                        price = variant.variant_specialPrice || variant.variant_price || 0;
+                        maxQty = variant.variant_totalStock || 0;
 
                         if (variant.variant_stockStatus !== STOCK_STATUS.IN_STOCK) {
                             available = false;
@@ -96,57 +277,125 @@ const getCart = async (req, res) => {
                     }
                 }
             }
+            else if (product.productType === PRODUCT_TYPES.DIGITAL || 
+                     product.productType === 'digital_product') {
+                // Digital product price calculation
+                price = product.simpleProduct?.sp_specialPrice || 
+                        product.simpleProduct?.sp_price || 
+                        product.productLevelStock?.pls_price ||
+                        0;
+                
+                // Digital products have different stock logic
+                maxQty = product.simpleProduct?.sp_totalStock || 
+                        product.totalAllowedQuantity || 
+                        999999;
+                
+                const hasStock = !product.simpleProduct?.sp_totalStock || 
+                                product.simpleProduct?.sp_totalStock > 0;
+                
+                if (!hasStock) {
+                    available = false;
+                    message = 'Digital product not available';
+                } else {
+                    // Check if trying to buy more than allowed
+                    const maxAllowed = product.totalAllowedQuantity || 5;
+                    if (item.qty > maxAllowed) {
+                        available = false;
+                        message = `Maximum ${maxAllowed} copies allowed per order`;
+                    }
+                }
+            }
+            else {
+                // Unknown product type
+                available = false;
+                message = `Invalid product type: ${product.productType}`;
+            }
 
             const itemTotal = price * item.qty;
 
-            return {
-                _id: item._id,
-                product: {
-                    _id: product._id,
-                    name: product.name,
-                    mainImages: product.mainImage,
-                    productType: product.productType,
-                    vendor: product.vendorId
-                },
-                variant: variant ? {
+            // Build variant details if exists
+            let variantDetails = null;
+            if (variant) {
+                variantDetails = {
                     _id: variant._id,
-                      variant_price: variant.variant_price,
+                    variant_price: variant.variant_price,
                     variant_specialPrice: variant.variant_specialPrice,
                     variant_isActive: variant.variant_isActive,
                     variant_stockStatus: variant.variant_stockStatus,
-                     variant_images: variant.variant_images || [],
-                      variant_dimensions: {
-                    variant_weight: variant.variant_weight,
-                    height: variant.variant_height,
-                    breadth: variant.variant_breadth,
-                    length: variant.variant_length
-                },
+                    variant_images: variant.variant_images || [],
+                    variant_dimensions: {
+                        variant_weight: variant.variant_weight,
+                        height: variant.variant_height,
+                        breadth: variant.variant_breadth,
+                        length: variant.variant_length
+                    },
                     variant_name: variant.variant_name,
                     variant_sku: variant.variant_sku,
                     attributes: variant.variant_attributes
+                };
+            }
+
+            // Build product details
+            const productDetails = {
+                _id: product._id,
+                name: product.name,
+                mainImage: product.mainImage || product.images?.[0] || null,
+                otherImages: product.otherImages || [],
+                productType: product.productType,
+                vendor: product.vendorId ? {
+                    _id: product.vendorId._id,
+                    name: product.vendorId.name,
+                    email: product.vendorId.email,
+                    businessName: product.vendorId.businessName
                 } : null,
+                // Add digital product flag
+                isDigital: product.productType === PRODUCT_TYPES.DIGITAL || 
+                          product.productType === 'digital_product'
+            };
+
+            return {
+                _id: item._id,
+                product: productDetails,
+                variant: variantDetails,
                 qty: item.qty,
                 price,
                 itemTotal,
                 available,
                 maxQty,
                 message,
-                inStock: available
+                inStock: available,
+                // Add stock info based on product type
+                stockInfo: product.productType === PRODUCT_TYPES.DIGITAL || 
+                          product.productType === 'digital_product' ? {
+                    type: 'digital',
+                    available: maxQty >= item.qty,
+                    remaining: maxQty - item.qty,
+                    isUnlimited: maxQty >= 999999,
+                    totalAllowed: product.totalAllowedQuantity || 5
+                } : {
+                    type: 'physical',
+                    totalStock: maxQty,
+                    available: maxQty - item.qty,
+                    status: product.simpleProduct?.sp_stockStatus || 
+                           variant?.variant_stockStatus || 
+                           STOCK_STATUS.OUT_OF_STOCK
+                }
             };
         }));
 
-        // Filter out unavailable items (optional)
+        // Filter available and unavailable items
         const availableItems = processedItems.filter(item => item.available);
+        const unavailableItems = processedItems.filter(item => !item.available);
 
-        // Calculate cart summary
+        // Calculate cart summary using helper function
         const summary = calculateCartSummary(availableItems);
 
-        // Update cart if there are unavailable items
-        if (availableItems.length !== cart.items.length) {
-            // Remove unavailable items from cart
-            const updatedItems = cart.items.filter((item, index) => {
-                return processedItems[index].available;
-            });
+        // Update cart if there are unavailable items (remove them)
+        if (unavailableItems.length > 0) {
+            const availableItemIds = availableItems.map(item => item._id);
+            const updatedItems = cart.items.filter(item => 
+                availableItemIds.includes(item._id.toString())
+            );
 
             await Cart.findOneAndUpdate(
                 { userId },
@@ -157,11 +406,17 @@ const getCart = async (req, res) => {
 
         res.status(200).json({
             success: true,
-            message: 'Cart retrieved successfully',
+            message: availableItems.length > 0 ? 'Cart retrieved successfully' : 'Cart is empty',
             data: {
                 items: availableItems,
                 summary,
-                unavailableItems: processedItems.filter(item => !item.available)
+                unavailableItems: unavailableItems.map(item => ({
+                    _id: item._id,
+                    productName: item.product?.name || 'Unknown Product',
+                    qty: item.qty,
+                    message: item.message,
+                    productType: item.product?.productType
+                }))
             }
         });
 
@@ -173,12 +428,39 @@ const getCart = async (req, res) => {
             error: error.message
         });
     }
-}
+};
+
+// // Helper function to calculate cart summary
+// const calculateCartSummary = (items) => {
+//     const totalItems = items.reduce((sum, item) => sum + item.qty, 0);
+//     const subtotal = items.reduce((sum, item) => sum + (item.itemTotal || 0), 0);
+    
+//     // You can add discount calculation logic here if needed
+//     const totalDiscount = 0;
+//     const deliveryCharge = 0; // Calculate based on your logic
+//     const taxAmount = 0; // Calculate based on your logic
+    
+//     const finalTotal = subtotal - totalDiscount + deliveryCharge + taxAmount;
+
+//     return {
+//         totalItems,
+//         itemCount: items.length,
+//         subtotal,
+//         totalDiscount,
+//         deliveryCharge,
+//         taxAmount,
+//         finalTotal,
+//         // Add digital vs physical counts
+//         digitalItemsCount: items.filter(item => item.product?.isDigital).length,
+//         physicalItemsCount: items.filter(item => !item.product?.isDigital).length
+//     };
+// };
 
 /**
  * Add item to cart
  */
 const addToCart = async (req, res) => {
+    console.log("req.body cart", req.body)
     const session = await mongoose.startSession();
     session.startTransaction();
 
@@ -197,6 +479,7 @@ const addToCart = async (req, res) => {
 
         // Get product with minimal fields
         const product = await Product.findById(productId).session(session);
+        console.log("product", product)
         if (!product) {
             throw new Error('Product not found');
         }
@@ -275,11 +558,11 @@ const addToCart = async (req, res) => {
                 _id: product._id,
                 name: product.name,
                 productType: product.productType,
-                mainImage: product.images?.[0] || null,
+               mainImage: product.images?.[0] || product.mainImage || null,
                 vendorId: product.vendorId
             };
 
-        } else if (product.productType === PRODUCT_TYPES.SIMPLE) {
+        } else if (product.productType === PRODUCT_TYPES.SIMPLE ) {
             if (variantId) {
                 throw new Error('Variant ID should not be provided for simple product');
             }
@@ -291,6 +574,7 @@ const addToCart = async (req, res) => {
             price = product.simpleProduct.sp_specialPrice || product.simpleProduct.sp_price;
             totalStock = product.simpleProduct.sp_totalStock;
             stockStatus = product.simpleProduct.sp_stockStatus;
+            console.log("product type cart",product.productType)
 
             // Simple product details
             productDetails = {
@@ -313,12 +597,75 @@ const addToCart = async (req, res) => {
                     }
                 }
             };
+        }  else if (product.productType === PRODUCT_TYPES.DIGITAL || 
+                 product.productType === 'digital_product') {
+            
+            if (variantId) {
+                throw new Error('Variant ID should not be provided for digital product');
+            }
+
+            // Digital products have different stock logic
+            // They might have unlimited stock or license-based stock
+            const simpleProduct = product.simpleProduct || {};
+            
+            // For digital products, we consider them "in stock" if:
+            // 1. They have a price set, AND
+            // 2. Either they have no stock limit or have available stock
+            const hasStock = !simpleProduct.sp_totalStock || simpleProduct.sp_totalStock > 0;
+            const isAvailable = hasStock && simpleProduct.sp_stockStatus !== STOCK_STATUS.OUT_OF_STOCK;
+            
+            if (!isAvailable) {
+                throw new Error('Digital product is not available');
+            }
+
+            // Get price - could be from simpleProduct or productLevel
+            price = simpleProduct.sp_specialPrice || 
+                    simpleProduct.sp_price || 
+                    product.productLevelStock?.pls_price ||
+                    0;
+
+            // For digital products, stock might be:
+            // - Unlimited (totalAllowedQuantity)
+            // - Limited (sp_totalStock)
+            // - License-based
+            totalStock = simpleProduct.sp_totalStock || 
+                        product.totalAllowedQuantity || 
+                        999999; // High number for "unlimited"
+            
+            stockStatus = simpleProduct.sp_stockStatus || STOCK_STATUS.IN_STOCK;
+
+            // Digital product details
+            productDetails = {
+                _id: product._id,
+                name: product.name,
+                productType: product.productType,
+                isDigital: true,
+                images: product.images || [],
+                mainImage: product.mainImage || product.images?.[0] || null,
+                description: product.description,
+                vendorId: product.vendorId,
+                downloadInfo: {
+                    isDownloadable: true,
+                    fileType: product.fileType || 'digital',
+                    fileSize: product.fileSize || null
+                },
+                simpleProduct: {
+                    sp_sku: simpleProduct.sp_sku,
+                    sp_price: simpleProduct.sp_price,
+                    sp_specialPrice: simpleProduct.sp_specialPrice
+                }
+            };
         } else {
             throw new Error('Invalid product type');
         }
 
         // Calculate new total quantity
         const newQty = existingCartQty + parseInt(qty);
+
+         // Validate stock availability for non-digital products
+        // Digital products might have different rules
+        if (product.productType !== PRODUCT_TYPES.DIGITAL && 
+            product.productType !== 'digital_product') {
 
         // Validate stock availability considering already reserved quantity
         if (newQty > totalStock) {
@@ -328,6 +675,13 @@ const addToCart = async (req, res) => {
                     ? `Only ${availableForAdd} more items available. You already have ${existingCartQty} in cart.`
                     : 'Product is out of stock'
             );
+        }
+         } else {
+            // For digital products, you might want to limit quantity per order
+            const maxDigitalQty = product.totalAllowedQuantity || 5; // Default max 5 for digital
+            if (newQty > maxDigitalQty) {
+                throw new Error(`Maximum ${maxDigitalQty} copies allowed per order`);
+            }
         }
 
         // Update or add item to cart
