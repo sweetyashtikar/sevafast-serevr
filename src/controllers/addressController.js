@@ -10,9 +10,9 @@ const mongoose = require('mongoose');
 
 // 1. CREATE - Add new address
 const createAddress = async (req, res) => {
+    const user_id = req.user._id
     try {
-        const { 
-            user_id,
+        const {
             city_id,
             area_id,
             name,
@@ -166,7 +166,8 @@ const createAddress = async (req, res) => {
 // 2. READ - Get all addresses for a user
 const getUserAddresses = async (req, res) => {
     try {
-        const { user_id } = req.params;
+        const user_id  = req.user._id;
+        console.log("userid", user_id)
         const { 
             type, 
             only_serviceable = 'false',
@@ -175,13 +176,6 @@ const getUserAddresses = async (req, res) => {
             page = 1 
         } = req.query;
 
-        // Validate user_id
-        if (!mongoose.Types.ObjectId.isValid(user_id)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid User ID format'
-            });
-        }
 
         // Check if user exists
         const userExists = await User.findById(user_id);
@@ -297,14 +291,7 @@ const getUserAddresses = async (req, res) => {
 const getAddressById = async (req, res) => {
     try {
         const { id } = req.params;
-
-        // Validate ID
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid Address ID format'
-            });
-        }
+        console.log("get by id", req.params)
 
         // Get address with populated references
         const address = await Address.findById(id)
@@ -352,15 +339,8 @@ const getAddressById = async (req, res) => {
 // 4. READ - Get user's default address
 const getDefaultAddress = async (req, res) => {
     try {
-        const { user_id } = req.params;
-
-        // Validate user_id
-        if (!mongoose.Types.ObjectId.isValid(user_id)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid User ID format'
-            });
-        }
+        const user_id  = req.user._id;
+        console.log("get default address", user_id)
 
         // Check if user exists
         const userExists = await User.findById(user_id);
@@ -571,14 +551,6 @@ const setDefaultAddress = async (req, res) => {
     try {
         const { id } = req.params;
 
-        // Validate ID
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid Address ID format'
-            });
-        }
-
         // Check if address exists
         const address = await Address.findById(id);
         if (!address) {
@@ -688,6 +660,7 @@ const deleteAddress = async (req, res) => {
     }
 };
 
+//not tested
 // 8. GEOSPATIAL - Find addresses near location
 const findNearbyAddresses = async (req, res) => {
     try {
@@ -790,6 +763,7 @@ const findNearbyAddresses = async (req, res) => {
 // 9. BULK - Create multiple addresses
 const bulkCreateAddresses = async (req, res) => {
     try {
+        const user_id = req.user._id
         const { addresses } = req.body;
 
         if (!Array.isArray(addresses) || addresses.length === 0) {
@@ -816,7 +790,7 @@ const bulkCreateAddresses = async (req, res) => {
         for (const addressData of addresses) {
             try {
                 // Validate required fields
-                const required = ['user_id', 'city_id', 'mobile', 'address', 'pincode'];
+                const required = [ 'city_id', 'mobile', 'address', 'pincode'];
                 const missing = required.filter(field => !addressData[field]);
                 
                 if (missing.length > 0) {
@@ -830,6 +804,7 @@ const bulkCreateAddresses = async (req, res) => {
                 // Create address
                 const address = new Address({
                     ...addressData,
+                    user_id: user_id,
                     name: addressData.name?.trim() || '',
                     mobile: addressData.mobile.trim(),
                     address: addressData.address.trim(),
@@ -883,6 +858,160 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
     return R * c; // Distance in km
 }
 
+//get the user address for admin by id of user
+const getUserAddressesByAdmin = async (req, res) => {
+    try {
+
+        const { user_id } = req.params;
+
+        const { 
+            type, 
+            only_serviceable = 'false',
+            only_default = 'false',
+            limit = 50,
+            page = 1 
+        } = req.query;
+
+        // ✅ Optional: Ensure admin access
+        // if (req.user.role !== 'admin') {
+        //     return res.status(403).json({
+        //         success: false,
+        //         message: "Access denied"
+        //     });
+        // }
+
+        // ✅ Check if user exists
+        const userExists = await User.findById(user_id);
+        if (!userExists) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        // ✅ Build query (NO req.user._id)
+        let query = { user_id };
+
+        if (type) {
+            const typeValues = Array.isArray(type) ? type : [type];
+            const normalizedTypes = typeValues.map(t => 
+                t.charAt(0).toUpperCase() + t.slice(1).toLowerCase()
+            );
+            query.type = { $in: normalizedTypes };
+        }
+
+        if (only_default === 'true') {
+            query.is_default = true;
+        }
+
+        // ✅ Pagination
+        const pageNum = parseInt(page);
+        const limitNum = parseInt(limit);
+        const skip = (pageNum - 1) * limitNum;
+
+        const total = await Address.countDocuments(query);
+
+        let addressesQuery = Address.find(query)
+            .populate('city_id', 'name state')
+            .populate({
+                path: 'area_id',
+                select: 'name delivery_charges minimum_free_delivery_order_amount active'
+            })
+            .sort({ is_default: -1, updatedAt: -1 })
+            .skip(skip)
+            .limit(limitNum);
+
+        const addresses = await addressesQuery.lean();
+
+        // ✅ Serviceable filter
+        let filteredAddresses = addresses;
+        if (only_serviceable === 'true') {
+            filteredAddresses = addresses.filter(addr => 
+                addr.area_id && addr.area_id.active === true
+            );
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'User addresses retrieved successfully',
+            data: {
+                user: {
+                    id: userExists._id,
+                    name: userExists.username,
+                    email: userExists.email
+                },
+                addresses: filteredAddresses.map(addr => ({
+                    ...addr,
+                    serviceable: addr.area_id ? addr.area_id.active : false,
+                    delivery_info: addr.area_id ? {
+                        charges: addr.area_id.delivery_charges,
+                        minimum_free_delivery: addr.area_id.minimum_free_delivery_order_amount
+                    } : null
+                })),
+                pagination: {
+                    current_page: pageNum,
+                    total_pages: Math.ceil(total / limitNum),
+                    total_items: total,
+                    items_per_page: limitNum,
+                    has_next: pageNum < Math.ceil(total / limitNum),
+                    has_previous: pageNum > 1
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error('Error fetching user addresses', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch user addresses'
+        });
+    }
+};
+
+//for admin
+const getAllUserAddresses = async (req, res) => {
+    try {
+
+        const { limit = 50, page = 1 } = req.query;
+
+        const pageNum = parseInt(page);
+        const limitNum = parseInt(limit);
+        const skip = (pageNum - 1) * limitNum;
+
+        // Fetch all addresses with user info
+        const total = await Address.countDocuments();
+
+        const addresses = await Address.find({})
+            .populate('user_id', 'username email')
+            .populate('city_id', 'name state')
+            .populate({
+                path: 'area_id',
+                select: 'name delivery_charges minimum_free_delivery_order_amount active'
+            })
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limitNum)
+            .lean();
+
+        res.status(200).json({
+            success: true,
+            data: addresses,
+            pagination: {
+                current_page: pageNum,
+                total_pages: Math.ceil(total / limitNum),
+                total_items: total
+            }
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to fetch all addresses"
+        });
+    }
+};
+
 module.exports = {
     createAddress,
     getUserAddresses,
@@ -892,5 +1021,7 @@ module.exports = {
     setDefaultAddress,
     deleteAddress,
     findNearbyAddresses,
-    bulkCreateAddresses
+    bulkCreateAddresses,
+    getUserAddressesByAdmin,
+    getAllUserAddresses
 };

@@ -519,6 +519,17 @@ const getAllProducts = async (req, res) => {
     if (brand) {
       query.brand = brand;
     }
+     if (deliverableZipcodes) {
+      query.$and = [
+        { isDeleted: false }, // Maintain existing base query
+        {
+          $or: [
+            { deliverableType: "all" },
+            { deliverableZipcodes: deliverableZipcodes }
+          ]
+        }
+      ];
+    }
 
     // Indicator filter (veg/non-veg)
     if (indicator !== undefined && indicator !== "") {
@@ -640,9 +651,9 @@ const getAllProductsWithFilters = async (req, res) => {
     }
 
     // Search filter (text search)
-    if (search) {
-      query.$text = { $search: search };
-    }
+   if (search) {
+  query.name = { $regex: search, $options: 'i' };
+}
 
     // Price range filter (for simple products)
     if (minPrice || maxPrice) {
@@ -714,6 +725,8 @@ const getAllProductsWithFilters = async (req, res) => {
       .sort(sort)
       .skip(skip)
       .limit(parseInt(limit));
+
+      console.log("products", products)
 
 
     // Get total count
