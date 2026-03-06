@@ -7,7 +7,7 @@ const { JWT_SECRET, JWT_EXPIRE, NODE_ENV } = require("../env-variables");
 const { decodeToken, resetToken } = require("../utils/jwt");
 const { sanitizeUser } = require("../utils/sanitizer");
 const { setTokenCookie, clearTokenCookie } = require("../utils/cookieHelper");
-const LoginAttempt = require("../models/LoginAttempt");
+const LoginAttempt = require('../models/LoginAttempt')
 const cron = require("../utils/cronjob");
 
 const checkBruteForce = async (loginIdentifier, ip) => {
