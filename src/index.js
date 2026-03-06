@@ -1,7 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
-const { MONGODB_URI } = require("./src/env-variables");
+const { MONGODB_URI } = require("./env-variables");
 const cookieParser = require("cookie-parser");
 const dns = require("dns");
 dns.setServers(["8.8.8.8"]);
@@ -9,41 +9,41 @@ dns.setServers(["8.8.8.8"]);
 const {
   authenticate,
   authorizePermission,
-} = require("./src/middleware/authMiddleware");
+} = require("./middleware/authMiddleware");
 
 const app = express();
 const port = process.env.PORT || 5000;
 
-const userRoute = require("./src/routes/userRoute");
-const authRoute = require("./src/routes/authRoute");
-const roleRoute = require("./src/routes/roleRoute");
-const categoryRoute = require("./src/routes/categoryRoute");
-const productRoute = require("./src/routes/productRoute");
-const cityRoutes = require("./src/routes/cityRoutes");
-const attributeSetRoute = require("./src/routes/attributeSet");
-const attributeRoute = require("./src/routes/attributeRoute");
-const attributeValueRoute = require("./src/routes/attributeValue");
-const taxRoute = require("./src/routes/taxRoute");
-const StatusRoute = require("./src/controllers/status");
-const CartRoute = require("./src/routes/cartRoute");
-const ZipcodeRoute = require("./src/routes/zipcodeRoute");
-const areaRoute = require("./src/routes/areaRoute");
-const addressRoute = require("./src/routes/addressRoute");
-const sellerRoute = require("./src/routes/sellerRoute");
-const faqRoute = require("./src/routes/faqroute");
-const favouriteRoute = require("./src/routes/favouriteRoute");
-const productFaqRoute = require("./src/routes/productFAQRoute");
-const OrderItemRoute = require("./src/routes/orderItemRoute");
+const userRoute = require("./routes/userRoute");
+const authRoute = require("./routes/authRoute");
+const roleRoute = require("./routes/roleRoute");
+const categoryRoute = require("./routes/categoryRoute");
+const productRoute = require("./routes/productRoute");
+const cityRoutes = require("./routes/cityRoutes");
+const attributeSetRoute = require("./routes/attributeSet");
+const attributeRoute = require("./routes/attributeRoute");
+const attributeValueRoute = require("./routes/attributeValue");
+const taxRoute = require("./routes/taxRoute");
+const StatusRoute = require("./controllers/status");
+const CartRoute = require("./routes/cartRoute");
+const ZipcodeRoute = require("./routes/zipcodeRoute");
+const areaRoute = require("./routes/areaRoute");
+const addressRoute = require("./routes/addressRoute");
+const sellerRoute = require("./routes/sellerRoute");
+const faqRoute = require("./routes/faqroute");
+const favouriteRoute = require("./routes/favouriteRoute");
+const productFaqRoute = require("./routes/productFAQRoute");
+const OrderItemRoute = require("./routes/orderItemRoute");
 // const paymentRoutes = require('./src/controllers/razorpaycontroller');
-const brandRoutes = require("./src/routes/brandRoute");
-const viewCartRoute = require("./src/routes/viewCartRoute");
-const userPermissionRoute = require("./src/routes/userPermissionRoute");
-const tezRoute = require("./src/routes/tezRoute");
-const DeliveryBoyRoute = require("./src/routes/deliveryBoyRoutes");
-const ReturnRequestRoute = require("./src/routes/returnRequestRoute");
-const BannerRoute = require("./src/routes/bannerRoute");
-const CouponRoute = require("./src/routes/couponRoute");
-const StockRoute = require("./src/routes/stockSalesRoute");
+const brandRoutes = require("./routes/brandRoute");
+const viewCartRoute = require("./routes/viewCartRoute");
+const userPermissionRoute = require("./routes/userPermissionRoute");
+const tezRoute = require("./routes/tezRoute");
+const DeliveryBoyRoute = require("./routes/deliveryBoyRoutes");
+const ReturnRequestRoute = require("./routes/returnRequestRoute");
+const BannerRoute = require("./routes/bannerRoute");
+const CouponRoute = require("./routes/couponRoute");
+const StockRoute = require("./routes/stockSalesRoute");
 
 /* Middleware */
 app.use(
