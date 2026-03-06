@@ -150,10 +150,10 @@ const couponSchema = new mongoose.Schema({
     // }],
 
     // User-specific restrictions (for single time valid)
-    // userIds: [{
-    //     type: mongoose.Schema.Types.ObjectId,
-    //     ref: 'User'
-    // }],
+    userIds: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    }],
 
     // Usage tracking
     // usedBy: [{

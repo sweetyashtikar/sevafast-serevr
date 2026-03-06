@@ -3,6 +3,7 @@ const {
   DELIVERABLE_TYPES,
   VARIANT_STOCK_LEVEL_TYPES,
   STOCK_STATUS,
+  INDICATOR_TYPES
 } = require("../types/productTypes");
 
  // Helper functions

@@ -174,7 +174,7 @@ router.patch(
 );
 
 router.patch(
-  "/:id",
+  "/approve/:id",
   authenticate,
   checkIfAdmin,
   productController.approveProduct

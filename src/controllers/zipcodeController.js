@@ -447,6 +447,43 @@ const bulkCreateZipcodes = async (req, res) => {
     }
 };
 
+const bulkCreateZipcodesInArray = async (req, res) => {
+    try {
+        const { zipcodes, city_id, is_deliverable = true } = req.body;
+
+        const existing = await Zipcode.find({
+            zipcode: { $in: zipcodes.map(z => String(z)) }
+        }).select('zipcode');
+
+        const existingSet = new Set(existing.map(z => z.zipcode));
+
+        const newZipcodes = zipcodes
+            .map(z => String(z))
+            .filter(z => !existingSet.has(z));
+
+        const docs = newZipcodes.map(z => ({
+            zipcode: z,
+            city_id,
+            is_deliverable
+        }));
+
+        const inserted = await Zipcode.insertMany(docs);
+
+        res.status(201).json({
+            success: true,
+            inserted_count: inserted.length,
+            skipped_duplicates: zipcodes.length - inserted.length
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to create zipcodes"
+        });
+    }
+};
+
 // 3. READ - Get all zipcodes (with pagination)
 const getAllZipcodes = async (req, res) => {
   try {
@@ -501,6 +538,7 @@ const getZipcodeById = async (req, res) => {
 
         const zipcode = await Zipcode.findById(id)
             .populate('city_id', 'name');
+            console.log("zipcodes", zipcode)
 
         if (!zipcode) {
             return res.status(404).json({
@@ -539,6 +577,7 @@ const checkZipcodeAvailability = async (req, res) => {
             zipcode: zipcode.trim(),
             is_deliverable: true 
         }).populate('city_id', 'name');
+        console.log("zipcodeDoc" ,zipcodeDoc )
 
         res.status(200).json({
             success: true,
@@ -674,9 +713,9 @@ const deleteZipcode = async (req, res) => {
 // 8. BULK DELETE - Delete multiple zipcodes
 const bulkDeleteZipcodes = async (req, res) => {
     try {
-        const { ids } = req.body; // Changed from 'zipcode' to 'ids' for clarity
+        const { zipcode  } = req.body; // Changed from 'zipcode' to 'ids' for clarity
 
-        if (!Array.isArray(ids) || ids.length === 0) {
+        if (!Array.isArray(zipcode) || zipcode.length === 0) {
             return res.status(400).json({
                 success: false,
                 message: 'Array of zipcode IDs is required'
@@ -692,7 +731,7 @@ const bulkDeleteZipcodes = async (req, res) => {
         //     });
         // }
 
-        const result = await Zipcode.deleteMany({ _id: { $in: ids } });
+        const result = await Zipcode.deleteMany({ _id: { $in: zipcode } });
 
         res.status(200).json({
             success: true,
@@ -782,5 +821,6 @@ module.exports = {
     deleteZipcode,
     bulkDeleteZipcodes,
     getZipcodesByCity ,
-    checkZipcodeAvailabilityTrue
+    checkZipcodeAvailabilityTrue,
+    bulkCreateZipcodesInArray
 };

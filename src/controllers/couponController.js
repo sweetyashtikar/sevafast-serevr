@@ -4,6 +4,8 @@ const {CouponType,DiscountType,UserType} = require('../models/coupons')
 const User = require('../models/User');
 const Order = require('../models/orders');
 const mongoose = require('mongoose');
+const Cart = require('../models/cart')
+const CouponService = require('../utils/coupon')
 
 
 // ==================== ADMIN CONTROLLERS ====================
@@ -13,7 +15,6 @@ const mongoose = require('mongoose');
 // @access  Private/Admin
 exports.createCoupon = async (req, res) => {
     try {
-        console.log("Create Coupon Request:", req.body);
         
         // Get image path if uploaded
         const image = req.file?.path;
@@ -506,9 +507,38 @@ exports.validateCoupon = async (req, res) => {
                 }
             }
 
+            // ✅ NEW: Check per-user usage limit
+            const userUsageCount = await Coupon.countDocuments({
+                coupon: coupon._id,
+                user: userId
+            });
+
+            if (userUsageCount >= (coupon.perUserUsageLimit || 1)) {
+                return res.status(400).json({
+                    success: false,
+                    message: `You have already used this coupon ${userUsageCount} time(s). Maximum usage per user is ${coupon.perUserUsageLimit || 1}.`
+                });
+            }
+
+             // ✅ NEW: Check if user already has this coupon applied to an active cart
+            // You would need a Cart model for this
+            const existingCartWithCoupon = await Cart.findOne({
+                user: userId,
+                'appliedCoupon.couponId': coupon._id,
+                status: 'active'
+            });
+            
+            if (existingCartWithCoupon) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'This coupon is already applied to your cart'
+                });
+            }
+        }
+
             // Check per-user usage limit (you'd need to track this in a separate collection)
             // This is a placeholder - implement with CouponUsage model
-        }
+        
 
         // Calculate discount
         let discountAmount = 0;
@@ -774,8 +804,10 @@ exports.BulkCouponStatus = async (req, res) => {
 
 // controllers/couponController.js
 exports.validateCouponForCart = async (req, res) => {
+    console.log("req.body coupon", req.body)
     try {
         const { couponCode, cartTotal } = req.body;
+        console.log("user", req.user)
         const userId = req.user._id;
 
         if (!couponCode || !cartTotal) {
@@ -806,6 +838,7 @@ exports.validateCouponForCart = async (req, res) => {
         });
 
     } catch (error) {
+        console.log("error in validate coupon", error)
         res.status(400).json({
             success: false,
             message: error.message
