@@ -8,7 +8,7 @@ const {createOrderItem,
     updateOrderItemStatus,
     updateOrderItem,
     getUserOrders,
-    getOrderAnalytics,
+    getOrderAnalyticsForAdmin,
     processRefund,
     getDeliveryBoyOrders,
     getSellerOrders,
@@ -18,7 +18,8 @@ const {createOrderItem,
     cancelOrderItem,
     markCommissionAsCredited,
     assignDeliveryBoy,
-    verifyDeliveryOTP
+    verifyDeliveryOTP,
+    getVendorOrderAnalytics
 } = require('../controllers/orderItemController');
 const {
      cancelShipment,
@@ -27,7 +28,7 @@ const {
     checkShippingServiceability,
     createShipRocketShipment
 } = require('../controllers/shiprocketController')
-const {authenticate,authorizePermission} = require('../middleware/authMiddleware');
+const {authenticate,authorizePermission, checkIfAdmin} = require('../middleware/authMiddleware');
 
 
 //create order
@@ -37,7 +38,7 @@ router.post('/',authenticate,createOrderItem ) // done
 // router.post('/bulk',bulkCreateOrderItems)
 
 //get all order item
-router.get('/', getAllOrderItems)//done
+router.get('/',authenticate, checkIfAdmin, getAllOrderItems)//done
 
 //get order Item by Id
 router.get('/:order_id', authenticate,getOrderItemById)//done
@@ -84,7 +85,10 @@ router.get('/get/deliveryBoys',authenticate,getDeliveryBoyOrders)
 //18. process refund
 router.post('/processrefund',processRefund)
 
-router.get('/orderAnalystics',getOrderAnalytics)
+router.get('/orderAnalystics/admin',authenticate, checkIfAdmin, getOrderAnalyticsForAdmin)
+
+router.get('/orderAnalystics/vendor',authenticate, getVendorOrderAnalytics)
+
 
 //shiprocket
 // Check shipping serviceability

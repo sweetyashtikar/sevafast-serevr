@@ -47,13 +47,10 @@ const {
 const addProduct = async (req, res) => {
   try {
     const body = req.body;
-    console.log("Add Product Request Body:", body);
-    console.log("Uploaded Files:", req.files);
     const vendorId = req.user._id;
 
     let mainImageUrl = '';
     let otherImageUrls = [];
-    console.log("req.files", req.files)
 
     if (req.files) {
       if (req.files.mainImage && req.files.mainImage[0]) {
@@ -140,7 +137,6 @@ const addProduct = async (req, res) => {
 addProductTypeData(productData, parsedBody, toInt, toFloat, toArray, req.files);
 
     const product = new Product(productData);
-    console.log("New Product Data:", product);
     await product.save();
 
     res.status(201).json({
@@ -252,8 +248,6 @@ const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
     const body = req.body;
-    console.log("Update Product Request Body:", body);
-    console.log("Uploaded Files:", req.files);
 
     // Find existing product
     const existingProduct = await Product.findById(id);
@@ -491,7 +485,6 @@ const getAllProducts = async (req, res) => {
       status, 
       isApproved
     } = req.query;
-    console.log(req.query)
 
     const query = {};
     if(status !== undefined && status !== ""){
@@ -582,7 +575,6 @@ if (inStock !== undefined && inStock !== "") {
       .limit(parseInt(limit));
 
        const total = await Product.countDocuments(query);
-       console.log("totoal", total)
 
 
     res.status(200).json({
@@ -631,7 +623,6 @@ const getAllProductsWithFilters = async (req, res) => {
       deliverableZipcodes
     } = req.query;
 
-    console.log("req product", req.query)
 
     // Build query
     const query = {
@@ -726,7 +717,6 @@ const getAllProductsWithFilters = async (req, res) => {
       .skip(skip)
       .limit(parseInt(limit));
 
-      console.log("products", products)
 
 
     // Get total count

@@ -22,6 +22,8 @@ const createOrderItem = async (req, res) => {
     const session = await mongoose.startSession();
     session.startTransaction();
 
+    console.log("req.body order", req.body)
+
     try {
         const {
             address_id,
@@ -261,6 +263,10 @@ const createOrderItem = async (req, res) => {
             promoDiscount +
             (parseFloat(tax_amount) || 0);
 
+            const orderStatus = payment_method === PaymentMethod.COD 
+            ? OrderStatus.PLACED 
+            : OrderStatus.PENDING_PAYMENT;
+
         // Create Order
         const order = new Order({
             user_id,
@@ -281,10 +287,10 @@ const createOrderItem = async (req, res) => {
             final_total: total,
             payment: {
                 method: payment_method,
-                status: payment_method === PaymentMethod.COD ? 'pending' : 'pending'
+                status:'pending'
             },
             delivery_info: delivery_info || {},
-            status: OrderStatus.PLACED,
+            status: orderStatus, 
             status_timestamps: {
                 placed: new Date()
             }
@@ -371,6 +377,15 @@ const createOrderItem = async (req, res) => {
                 itemsWithDetails
             );
         }, 0);
+        console.log("data order", data={
+            order_id: order._id,
+                order_number: order.order_number,
+                delivery_charge: finalDeliveryCharge,
+                total: total,
+                coupon_applied: !!appliedCoupon,
+                coupon_discount: couponDiscount,
+                email_sent: true
+        })
 
         res.status(201).json({
             success: true,
@@ -3100,7 +3115,7 @@ const processRefund = async (req, res) => {
     }
 }
 
-const getOrderAnalytics = async (req, res) => {
+const getOrderAnalyticsForAdmin = async (req, res) => {
     try {
         const { start_date, end_date } = req.query;
 
@@ -3112,40 +3127,206 @@ const getOrderAnalytics = async (req, res) => {
             };
         }
 
-        const analytics = await Order.aggregate([
-            { $match: dateFilter },
+        const result = await Order.aggregate([
+            // { $match: dateFilter },
             {
                 $group: {
-                    _id: '$status',
-                    count: { $sum: 1 },
-                    totalRevenue: { $sum: '$final_total' }
+                    _id: null,
+
+                    totalOrders: { $sum: 1 },
+                    totalRevenue: { $sum: "$final_total" },
+
+                    pendingCount: {
+                        $sum: {
+                            $cond: [{ $eq: ["$status", "Order placed"] }, 1, 0]
+                        }
+                    },
+                    pendingRevenue: {
+                        $sum: {
+                            $cond: [{ $eq: ["$status", "Order placed"] }, "$final_total", 0]
+                        }
+                    },
+
+                    processingCount: {
+                        $sum: {
+                            $cond: [
+                                {
+                                    $in: [
+                                        "$status",
+                                        ["processed", "assigned", "picked_up", "shipped"]
+                                    ]
+                                },
+                                1,
+                                0
+                            ]
+                        }
+                    },
+                    processingRevenue: {
+                        $sum: {
+                            $cond: [
+                                {
+                                    $in: [
+                                        "$status",
+                                        ["processed", "assigned", "picked_up", "shipped"]
+                                    ]
+                                },
+                                "$final_total",
+                                0
+                            ]
+                        }
+                    },
+
+                    deliveredCount: {
+                        $sum: {
+                            $cond: [{ $eq: ["$status", "delivered"] }, 1, 0]
+                        }
+                    },
+                    deliveredRevenue: {
+                        $sum: {
+                            $cond: [{ $eq: ["$status", "delivered"] }, "$final_total", 0]
+                        }
+                    }
                 }
             }
         ]);
 
-        const totalOrders = await Order.countDocuments(dateFilter);
-        const totalRevenue = await Order.aggregate([
-            { $match: dateFilter },
-            { $group: { _id: null, total: { $sum: '$final_total' } } }
-        ]);
+        const data = result[0] || {};
 
         res.json({
             success: true,
+            message : "Orders fetched",
             data: {
-                totalOrders,
-                totalRevenue: totalRevenue[0]?.total || 0,
-                statusBreakdown: analytics
+                totalOrders: {
+                    count: data.totalOrders || 0,
+                    revenue: data.totalRevenue || 0
+                },
+                pendingOrders: {
+                    count: data.pendingCount || 0,
+                    revenue: data.pendingRevenue || 0
+                },
+                processingOrders: {
+                    count: data.processingCount || 0,
+                    revenue: data.processingRevenue || 0
+                },
+                deliveredOrders: {
+                    count: data.deliveredCount || 0,
+                    revenue: data.deliveredRevenue || 0
+                }
             }
         });
 
     } catch (error) {
         res.status(500).json({
             success: false,
-            message: 'Failed to fetch analytics',
+            message: "Failed to fetch analytics",
             error: error.message
         });
     }
-}
+};
+
+const getVendorOrderAnalytics = async (req, res) => {
+    try {
+        const sellerId = req.user._id; // vendor logged in
+        // const { start_date, end_date } = req.query;
+
+        // const match = {
+        //     seller_id: new mongoose.Types.ObjectId(sellerId)
+        // };
+
+        // if (start_date && end_date) {
+        //     match.date_added = {
+        //         $gte: new Date(start_date),
+        //         $lte: new Date(end_date)
+        //     };
+        // }
+
+        const analytics = await OrderItem.aggregate([
+            {
+                $match: { seller_id: sellerId }
+            },
+            {
+                $group: {
+                    _id: null,
+
+                    totalOrders: { $sum: 1 },
+                    totalRevenue: { $sum: "$sub_total" },
+
+                    pendingCount: {
+                        $sum: {
+                            $cond: [{ $eq: ["$active_status", "awaiting"] }, 1, 0]
+                        }
+                    },
+                    pendingRevenue: {
+                        $sum: {
+                            $cond: [{ $eq: ["$active_status", "awaiting"] }, "$sub_total", 0]
+                        }
+                    },
+
+                    processingCount: {
+                        $sum: {
+                            $cond: [
+                                { $in: ["$active_status", ["processed", "shipped"]] },
+                                1,
+                                0
+                            ]
+                        }
+                    },
+                    processingRevenue: {
+                        $sum: {
+                            $cond: [
+                                { $in: ["$active_status", ["processed", "shipped"]] },
+                                "$sub_total",
+                                0
+                            ]
+                        }
+                    },
+
+                    deliveredCount: {
+                        $sum: {
+                            $cond: [{ $eq: ["$active_status", "delivered"] }, 1, 0]
+                        }
+                    },
+                    deliveredRevenue: {
+                        $sum: {
+                            $cond: [{ $eq: ["$active_status", "delivered"] }, "$sub_total", 0]
+                        }
+                    }
+                }
+            }
+        ]);
+
+        const data = analytics[0] || {};
+
+        res.json({
+            success: true,
+            data: {
+                totalOrders: {
+                    count: data.totalOrders || 0,
+                    revenue: data.totalRevenue || 0
+                },
+                pendingOrders: {
+                    count: data.pendingCount || 0,
+                    revenue: data.pendingRevenue || 0
+                },
+                processingOrders: {
+                    count: data.processingCount || 0,
+                    revenue: data.processingRevenue || 0
+                },
+                deliveredOrders: {
+                    count: data.deliveredCount || 0,
+                    revenue: data.deliveredRevenue || 0
+                }
+            }
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: "Failed to fetch vendor analytics",
+            error: error.message
+        });
+    }
+};
 
 // Helper function to update parent order status based on order items
 const updateParentOrderStatus = async (orderId, session) => {
@@ -3929,12 +4110,13 @@ module.exports = {
     bulkCreateOrderItems,
     createOrderItem,
     getUserOrders,
-    getOrderAnalytics,
+    getOrderAnalyticsForAdmin,
     processRefund,
     getDeliveryBoyOrders,
     getSellerOrders,
     cancelOrder,
     updateOrderStatus,
     assignDeliveryBoy,
-    verifyDeliveryOTP
+    verifyDeliveryOTP,
+    getVendorOrderAnalytics
 }

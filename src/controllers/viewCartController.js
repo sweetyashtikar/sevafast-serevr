@@ -810,6 +810,7 @@ const updateCartItem = async (req, res) => {
         if (!product) {
             throw new Error('Product not found');
         }
+        console.log()
 
         let availableQty = 0;
 
@@ -820,7 +821,7 @@ const updateCartItem = async (req, res) => {
             }
             availableQty = variant.variant_totalStock;
         }
-        else if (product.productType === PRODUCT_TYPES.SIMPLE) {
+    else if (product.productType === PRODUCT_TYPES.SIMPLE || product.productType === PRODUCT_TYPES.DIGITAL) {
             availableQty = product.simpleProduct.sp_totalStock;
         }
 
