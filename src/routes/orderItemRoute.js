@@ -19,7 +19,8 @@ const {createOrderItem,
     markCommissionAsCredited,
     assignDeliveryBoy,
     verifyDeliveryOTP,
-    getVendorOrderAnalytics
+    getVendorOrderAnalytics,
+    updatePaymentMethod
 } = require('../controllers/orderItemController');
 const {
      cancelShipment,
@@ -33,6 +34,8 @@ const {authenticate,authorizePermission, checkIfAdmin} = require('../middleware/
 
 //create order
 router.post('/',authenticate,createOrderItem ) // done
+
+router.patch('/:order_id/payment-method', updatePaymentMethod);
 
 //bulk create order ITems
 // router.post('/bulk',bulkCreateOrderItems)

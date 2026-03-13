@@ -263,9 +263,7 @@ const createOrderItem = async (req, res) => {
             promoDiscount +
             (parseFloat(tax_amount) || 0);
 
-            const orderStatus = payment_method === PaymentMethod.COD 
-            ? OrderStatus.PLACED 
-            : OrderStatus.PENDING_PAYMENT;
+           
 
        const timestamp = Date.now();
         const randomNum = Math.floor(Math.random() * 10000);
@@ -290,12 +288,12 @@ const createOrderItem = async (req, res) => {
             total_payable: total,
             final_total: total,
             payment: {
-                method: payment_method,
+                method: PaymentMethod.PENDING,
                 status:'pending',
                 transaction_id : transaction_id
             },
             delivery_info: delivery_info || {},
-            status: orderStatus, 
+            status: OrderStatus.PENDING, 
             status_timestamps: {
                 placed: new Date()
             }
@@ -4102,10 +4100,147 @@ const sendOrderEmailInBackground = async (order, user, items) => {
 
 };
 
+//CODE TO UPDATE THE PAYMENT METHOD
+const updatePaymentMethod = async (req, res) => {
+  //pass the order id as the parameter
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { order_id } = req.params; // Get order ID from URL parameter
+    const { payment_method } = req.body; // Get new payment method from request body
+
+    console.log("Updating payment method for order:", order_id);
+    console.log("New payment method:", payment_method);
+
+    // Validate input
+    if (!order_id) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        success: false,
+        message: 'Order ID is required'
+      });
+    }
+
+    if (!payment_method) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        success: false,
+        message: 'Payment method is required in request body'
+      });
+    }
+
+    // Validate payment method (add your valid payment methods)
+    const validPaymentMethods = ['COD', 'upi', 'card', 'netbanking', 'wallet','tez','Razorpay'];
+    if (!validPaymentMethods.includes(payment_method)) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        success: false,
+        message: `Invalid payment method. Must be one of: ${validPaymentMethods.join(', ')}`
+      });
+    }
+
+    // Find the order first to check if it exists and can be updated
+    const order = await Order.findById(order_id).session(session);
+
+    if (!order) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+
+    // Check if order can be modified (only pending orders can change payment method)
+    if (order.payment.status !== 'pending') {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        success: false,
+        message: `Cannot update payment method. Order payment status is: ${order.payment.status}`
+      });
+    }
+
+    // Update the payment method
+    // const updatedOrder = await Order.findByIdAndUpdate(
+    //   order_id,
+    //   {
+    //     'payment.method': payment_method,
+    //     // If changing from COD to online payment, you might want to update other fields
+    //     ...(payment_method !== 'COD' && {
+    //       'payment.transaction_id': order.payment.transaction_id // Keep existing transaction ID if any
+    //     }),
+    //     updatedAt: new Date()
+    //   },
+    //   {
+    //     session,
+    //     new: true, // Return the updated document
+    //     runValidators: true // Run schema validators
+    //   }
+    // );
+
+
+    const updatedOrder = await Order.findByIdAndUpdate(
+  order_id,
+  {
+    'payment.method': payment_method,
+    // If COD, update status to Order placed
+    ...(payment_method === 'COD' && {
+      status: OrderStatus.PLACED,
+      'status_timestamps.placed': new Date()
+    }),
+    // If not COD, keep existing transaction ID
+    ...(payment_method !== 'COD' && {
+      'payment.transaction_id': order.payment.transaction_id
+    }),
+    updatedAt: new Date()
+  },
+  {
+    session,
+    new: true,
+    runValidators: true
+  }
+);
+
+    console.log("Updated order:", updatedOrder);
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Payment method updated successfully',
+      data: {
+        order_id: updatedOrder._id,
+        payment_method: updatedOrder.payment.method,
+        payment_status: updatedOrder.payment.status,
+        order: updatedOrder
+      }
+    });
+
+  } catch (error) {
+    // Abort transaction on error
+    await session.abortTransaction();
+    session.endSession();
+    
+    console.error('Update payment method error:', error);
+    
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update payment method',
+      error: error.message
+    });
+  }
+};
 
 
 
 module.exports = {
+    updatePaymentMethod,
     getSellerPerformance,
     cancelOrderItem,
     markCommissionAsCredited,

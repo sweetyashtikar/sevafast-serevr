@@ -5,16 +5,16 @@ const axios = require('axios');
 const qs = require('qs');
 const { default: mongoose } = require('mongoose');
 const Order = require('../models/orders');
-const {PaymentStatus} =  require('../models/orders')
+const { PaymentStatus , OrderStatus} = require('../models/orders')
 const session = require('mongoose')
-const {TEZ_PAYMENT_API_KEY} = require('../env-variables')
+const { TEZ_PAYMENT_API_KEY } = require('../env-variables')
 
 // Generate TezGateway payment URL
 router.post('/generate-payment-url/:order_id', async (req, res) => {
-   let session = null;
+  let session = null;
   try {
     const order_id = req.params
-      session = await mongoose.startSession();
+    session = await mongoose.startSession();
     session.startTransaction();
 
     const { trans_id, amount, customer_mobile, customer_email, customer_name } = req.body;
@@ -40,7 +40,7 @@ router.post('/generate-payment-url/:order_id', async (req, res) => {
       customer_mobile: customer_mobile,
       amount: amount,
       order_id: trans_id,
-        redirect_url: 'https://yourdomain.com/payment/success', // ✅ Fixed: use 'redirect_url'
+      redirect_url: 'https://yourdomain.com/payment/success', // ✅ Fixed: use 'redirect_url'
       //   remark1: customer_name || 'Order payment',
       //   remark2: customer_email || 'no-email@example.com'
     };
@@ -56,10 +56,10 @@ router.post('/generate-payment-url/:order_id', async (req, res) => {
 
     console.log("TezGateway Response:", response.data);
 
-   // ✅ CORRECT RESPONSE CHECK - status is boolean
+    // ✅ CORRECT RESPONSE CHECK - status is boolean
     if (response.data && response.data.status === true) {
-      
-       // Commit transaction if everything is successful
+
+      // Commit transaction if everything is successful
       if (session) {
         await session.commitTransaction();
         session.endSession();
@@ -108,7 +108,7 @@ router.get('/verify-payment/:order_id', async (req, res) => {
   try {
     const { order_id } = req.params;
     console.log("order_id", order_id)
-     const { trans_id} = req.body;
+    const { trans_id } = req.body;
     console.log("req.body of trnsaction start", req.body)
 
     // Validate input
@@ -141,7 +141,9 @@ router.get('/verify-payment/:order_id', async (req, res) => {
     if (response.success === true && response.data.status === true) {
       await Order.findByIdAndUpdate(order_id, {
         'payment.status': PaymentStatus.PAID,
-        'payment.paid_at': new Date()
+        'payment.paid_at': new Date(),
+        status: OrderStatus.PLACED,
+        'status_timestamps.placed': new Date()
       }, {
         session,
         new: true
