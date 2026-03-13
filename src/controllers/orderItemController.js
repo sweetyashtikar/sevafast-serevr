@@ -61,9 +61,13 @@ const createOrderItem = async (req, res) => {
         }
 
         // Get delivery charge from area and convert to number
-        const areaDeliveryCharge = parseFloat(userAddress.area_id.delivery_charges) || 0;
-        const minimumFreeDeliveryAmount = parseFloat(userAddress.area_id.minimum_free_delivery_order_amount) || 0;
+        // const areaDeliveryCharge = parseFloat(userAddress.area_id.delivery_charges) || 0;
+        // const minimumFreeDeliveryAmount = parseFloat(userAddress.area_id.minimum_free_delivery_order_amount) || 0;
+const areaDeliveryCharge =
+  parseFloat(userAddress?.area_id?.delivery_charges ?? 0);
 
+const minimumFreeDeliveryAmount =
+  parseFloat(userAddress?.area_id?.minimum_free_delivery_order_amount ?? 0);
         // Check ShipRocket serviceability if shipping_method is 'shiprocket'
         let shiprocketServiceability = null;
         let shiprocketDeliveryCharge = areaDeliveryCharge;
