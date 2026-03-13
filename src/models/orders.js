@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const OrderStatus = {
+    PENDING : 'PENDING',
     PLACED: 'Order placed',
     PROCESSED: 'processed',
     ASSIGNED: 'assigned',     // Added - assigned to delivery boy
@@ -13,6 +14,7 @@ const OrderStatus = {
 
 
 const PaymentMethod = {
+    PENDING : 'pending',
     COD: 'COD',
     PAYPAL: 'PayPal',
     BANK_TRANSFER: 'bank_transfer',

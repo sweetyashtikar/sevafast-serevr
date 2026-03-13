@@ -44,6 +44,7 @@ const ReturnRequestRoute = require("./routes/returnRequestRoute");
 const BannerRoute = require("./routes/bannerRoute");
 const CouponRoute = require("./routes/couponRoute");
 const StockRoute = require("./routes/stockSalesRoute");
+const LeadRoute = require('./routes/leadRoute')
 
 /* Middleware */
 app.use(
@@ -101,6 +102,7 @@ app.use("/api/return_request", ReturnRequestRoute);
 app.use("/api/banners", BannerRoute);
 app.use("/api/coupons", CouponRoute);
 app.use("/api/stock", StockRoute);
+app.use("/api/lead",LeadRoute)
 
 app.listen(port, () => {
   console.log(`Server is running on port: ${port}`);

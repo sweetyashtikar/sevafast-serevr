@@ -7,19 +7,19 @@ const {authenticate} = require('../middleware/authMiddleware');
 router.use(authenticate);
 
 // Get user's cart
-router.get('/', cartController.getCart);
+router.get('/', cartController.getCart);//done
 
 // Get cart summary
-router.get('/summary', cartController.getCartSummary);
+router.get('/summary', cartController.getCartSummary);//done
 
 // Get cart count
-router.get('/count', cartController.getCartCount);
+router.get('/count', cartController.getCartCount);//done
 
 // Add item to cart
-router.post('/addtoCart', cartController.addToCart);
+router.post('/addtoCart', cartController.addToCart);//done
 
 // Update cart item quantity
-router.put('/item/:itemId', cartController.updateCartItem);
+router.put('/item/:itemId', cartController.updateCartItem);//done
 
 // Remove item from cart
 router.delete('/item/:itemId', cartController.removeFromCart);
