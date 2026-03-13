@@ -1,5 +1,7 @@
 // webhook url :"https://upi.tezindia.in/api/create-order"
 
+const Module = require("node:module");
+
 // get request = "https://upi.tezindia.in/api/create-order?status=SUCCESS&utr=104097179160&order_id=ORDR977135546&amount=500.00&customer_mobile=9766128730&method=HDFC&merchentMobile=7083044400&remark1=test1&remark2=test2",
 
 // post request = {
@@ -296,8 +298,7 @@ function checkOrderStatus(userToken, orderId, callback) {
 // });
 
 // Export the function for use in other scripts if needed
-export { checkOrderStatus };
-
+Module.exports = { checkOrderStatus };
 
 // Usage
 // const api = new TezGatewayCreateOrderAPI('https://upi.tezindia.in/api/create-order');

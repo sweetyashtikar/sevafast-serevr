@@ -25,6 +25,11 @@ const FRONTEND_URL = process.env.FRONTEND_URL
 
 const TEZ_PAYMENT_API_KEY = process.env.TEZ_PAYMENT_API_KEY
 
+const RAZORPAY_KEY = process.env.RAZORPAY_KEY
+
+const RAZORPAY_SECRET = process.env.RAZORPAY_SECRET
+
+
 module.exports = {
   MONGODB_URI,
   PORT,
@@ -37,5 +42,7 @@ module.exports = {
   GOOGLE_SMTP_USER,
   NODE_ENV,
   FRONTEND_URL,
-  TEZ_PAYMENT_API_KEY
+  TEZ_PAYMENT_API_KEY,
+  RAZORPAY_KEY,
+  RAZORPAY_SECRET
 };
