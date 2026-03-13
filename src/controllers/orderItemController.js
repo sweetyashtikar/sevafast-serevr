@@ -267,6 +267,10 @@ const createOrderItem = async (req, res) => {
             ? OrderStatus.PLACED 
             : OrderStatus.PENDING_PAYMENT;
 
+       const timestamp = Date.now();
+        const randomNum = Math.floor(Math.random() * 10000);
+        const transaction_id = `TRANS_${timestamp}_${randomNum}`
+
         // Create Order
         const order = new Order({
             user_id,
@@ -287,7 +291,8 @@ const createOrderItem = async (req, res) => {
             final_total: total,
             payment: {
                 method: payment_method,
-                status:'pending'
+                status:'pending',
+                transaction_id : transaction_id
             },
             delivery_info: delivery_info || {},
             status: orderStatus, 
@@ -380,6 +385,7 @@ const createOrderItem = async (req, res) => {
         console.log("data order", data={
             order_id: order._id,
                 order_number: order.order_number,
+                transaction_id : order.payment.transaction_id,
                 delivery_charge: finalDeliveryCharge,
                 total: total,
                 coupon_applied: !!appliedCoupon,
@@ -393,6 +399,7 @@ const createOrderItem = async (req, res) => {
             data: {
                 order_id: order._id,
                 order_number: order.order_number,
+                transaction_id : order.payment.transaction_id,
                 delivery_charge: finalDeliveryCharge,
                 total: total,
                 coupon_applied: !!appliedCoupon,
