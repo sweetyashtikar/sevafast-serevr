@@ -33,7 +33,7 @@ router.post('/generate-payment-url/:order_id', async (req, res) => {
     // ✅ CORRECT API URL - Use their working endpoint
     const TEZGATEWAY_API_URL = 'https://upi.tezindia.in/api/create-order';
 
-
+console.log("token",TEZ_PAYMENT_API_KEY)
     // ✅ CORRECT PARAMETER NAMES
     const formData = {
       user_token: TEZ_PAYMENT_API_KEY,           // ✅ Fixed: use 'user_token' not secret_key
