@@ -13,4 +13,6 @@ router.post('/resetpassword', auth.resetPassword);
 
 router.post('/logout',protect, auth.LogoutUser);
 
+router.post("/vendor/register", auth.RegisterVendor);
+
 module.exports = router;

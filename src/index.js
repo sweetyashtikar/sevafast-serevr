@@ -44,8 +44,8 @@ const ReturnRequestRoute = require("./routes/returnRequestRoute");
 const BannerRoute = require("./routes/bannerRoute");
 const CouponRoute = require("./routes/couponRoute");
 const StockRoute = require("./routes/stockSalesRoute");
-const LeadRoute = require('./routes/leadRoute')
-
+const LeadRoute = require('./routes/leadRoute');
+const VendorRouter = require('./routes/vendorRoutes');
 /* Middleware */
 app.use(
   cors({
@@ -104,7 +104,7 @@ app.use("/api/coupons", CouponRoute);
 app.use("/api/stock", StockRoute);
 app.use("/api/lead",LeadRoute)
 app.use("/api/payments", razorpayRoute);
-
+app.use("/api/vendor",VendorRouter)
 app.listen(port, () => {
   console.log(`Server is running on port: ${port}`);
 });

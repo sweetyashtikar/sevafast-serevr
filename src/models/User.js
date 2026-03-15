@@ -68,6 +68,11 @@ const userSchema = new mongoose.Schema(
       },
     },
 
+field_manager: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+
     // --- Timestamps & Tracking ---
     last_login: { type: Date },
     created_on: { type: Date, default: Date.now },
