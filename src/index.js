@@ -34,11 +34,11 @@ const faqRoute = require("./routes/faqroute");
 const favouriteRoute = require("./routes/favouriteRoute");
 const productFaqRoute = require("./routes/productFAQRoute");
 const OrderItemRoute = require("./routes/orderItemRoute");
-// const paymentRoutes = require('./src/controllers/razorpaycontroller');
+const razorpayRoute = require("./routes/razorpayRoute");
 const brandRoutes = require("./routes/brandRoute");
 const viewCartRoute = require("./routes/viewCartRoute");
 const userPermissionRoute = require("./routes/userPermissionRoute");
-const tezRoute = require("./routes/tezRoute");
+// const tezRoute = require("./routes/tezRoute");
 const DeliveryBoyRoute = require("./routes/deliveryBoyRoutes");
 const ReturnRequestRoute = require("./routes/returnRequestRoute");
 const BannerRoute = require("./routes/bannerRoute");
@@ -93,7 +93,7 @@ app.use("/api/faq", faqRoute);
 app.use("/api/favourite", favouriteRoute);
 app.use("/api/product-faqs", productFaqRoute);
 app.use("/api/order", OrderItemRoute);
-app.use("/api/payments", tezRoute);
+// app.use("/api/payments", tezRoute);
 app.use("/api/brands", brandRoutes);
 app.use("/api/viewCart", viewCartRoute);
 app.use("/api/userPermission", userPermissionRoute);
@@ -103,6 +103,7 @@ app.use("/api/banners", BannerRoute);
 app.use("/api/coupons", CouponRoute);
 app.use("/api/stock", StockRoute);
 app.use("/api/lead",LeadRoute)
+app.use("/api/payments", razorpayRoute);
 
 app.listen(port, () => {
   console.log(`Server is running on port: ${port}`);

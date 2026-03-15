@@ -265,14 +265,31 @@ const getCart = async (req, res) => {
                         message = 'Variant not available';
                     } else {
                         price = variant.variant_specialPrice || variant.variant_price || 0;
-                        maxQty = variant.variant_totalStock || 0;
+                        
+                        // Check stock status based on user's pinpointed rules
+                        const totalVariantQty = product.variants?.reduce((sum, v) => sum + (v.variant_totalStock || 0), 0) || 0;
 
-                        if (variant.variant_stockStatus !== STOCK_STATUS.IN_STOCK) {
+                        if (product.variantStockLevelType === 'product_level') {
+                            maxQty = product.productLevelStock?.pls_totalStock || 0;
+                            // Forced out if total variations qty zero
+                            if (maxQty <= 0 || totalVariantQty <= 0) {
+                                available = false;
+                                message = 'Product out of stock';
+                            }
+                        } else {
+                            // variable_level: Check quantity of specific variant
+                            maxQty = variant.variant_totalStock || 0;
+                            if (maxQty <= 0) {
+                                available = false;
+                                message = 'Variant out of stock';
+                            }
+                        }
+
+                        if (available && maxQty < item.qty) {
                             available = false;
-                            message = 'Variant out of stock';
-                        } else if (maxQty < item.qty) {
-                            available = false;
-                            message = `Only ${maxQty} items available for this variant`;
+                            message = product.variantStockLevelType === 'product_level' 
+                                ? `Only ${maxQty} items available for this product`
+                                : `Only ${maxQty} items available for this variant`;
                         }
                     }
                 }
@@ -526,13 +543,24 @@ const addToCart = async (req, res) => {
                 throw new Error('Variant not available');
             }
 
-            if (variant.variant_stockStatus !== STOCK_STATUS.IN_STOCK) {
-                throw new Error('Variant is out of stock');
+            const totalVariantQty = product.variants?.reduce((sum, v) => sum + (v.variant_totalStock || 0), 0) || 0;
+
+            if (product.variantStockLevelType === 'product_level') {
+                totalStock = product.productLevelStock?.pls_totalStock || 0;
+                if (totalStock <= 0 || totalVariantQty <= 0) {
+                    throw new Error('Product is out of stock');
+                }
+                stockStatus = product.productLevelStock?.pls_stockStatus;
+            } else {
+                // variable_level: Check quantity of specific variant
+                totalStock = variant.variant_totalStock || 0;
+                if (totalStock <= 0) {
+                    throw new Error('Variant is out of stock');
+                }
+                stockStatus = variant.variant_stockStatus;
             }
 
             price = variant.variant_specialPrice || variant.variant_price;
-            totalStock = variant.variant_totalStock;
-            stockStatus = variant.variant_stockStatus;
 
             // Extract only the needed variant details
             selectedVariantDetails = {
@@ -819,7 +847,11 @@ const updateCartItem = async (req, res) => {
             if (!variant) {
                 throw new Error('Variant not found');
             }
-            availableQty = variant.variant_totalStock;
+            if (product.variantStockLevelType === 'product_level') {
+                availableQty = product.productLevelStock?.pls_totalStock || 0;
+            } else {
+                availableQty = variant.variant_totalStock || 0;
+            }
         }
     else if (product.productType === PRODUCT_TYPES.SIMPLE || product.productType === PRODUCT_TYPES.DIGITAL) {
             availableQty = product.simpleProduct.sp_totalStock;

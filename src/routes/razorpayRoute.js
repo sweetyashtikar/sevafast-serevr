@@ -1,20 +1,15 @@
-// app.js (complete version)
-require('dotenv').config();
 const express = require('express');
-const cors = require('cors');
-const path = require('path');
 const router = express.Router();
+const { 
+    createOrder, 
+    verifyPayment, 
+    getPaymentDetails,
+    cancelPayment
+} = require('../controllers/razorpaycontroller');
 
-const app = express();
+router.post('/create-order', createOrder);
+router.post('/verify-payment', verifyPayment);
+router.post('/cancel-payment', cancelPayment);
+router.get('/payment/:paymentId', getPaymentDetails);
 
-// Middleware
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Routes
-const paymentRoutes = require('../controllers/razorpaycontroller');
-app.use('/api/payments', paymentRoutes);
-
-
+module.exports = router;

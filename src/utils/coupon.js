@@ -48,10 +48,11 @@ const validateAndApplyCoupon = async (couponCode, userId, orderAmount, items = [
             }
         }
 
-        // Check per-user usage limit
+        // Check per-user usage limit (ignore cancelled orders)
         const userOrdersWithCoupon = await Order.countDocuments({
             user_id: userId,
-            'promo_details.code': couponCode.toUpperCase()
+            'promo_details.code': couponCode.toUpperCase(),
+            status: { $ne: 'cancelled' }
         });
 
         if (userOrdersWithCoupon >= coupon.perUserUsageLimit) {
@@ -89,10 +90,24 @@ const validateAndApplyCoupon = async (couponCode, userId, orderAmount, items = [
             'promo_details.discount': discountAmount,
             'promo_details.discount_type': 'fixed'
         });
+    }
 
-        // You might also want to track coupon usage in a separate collection
-        // await CouponUsage.create({...})
+    const rollbackCouponUsage = async (orderId) => {
+        try {
+            const orderDoc = await Order.findById(orderId);
+            if (!orderDoc || !orderDoc.promo_details?.code) return;
+
+            // Decrement total used count
+            await Coupon.findOneAndUpdate(
+                { couponCode: orderDoc.promo_details.code.toUpperCase() },
+                { $inc: { totalUsedCount: -1 } }
+            );
+            
+            console.log(`Rolled back coupon usage for order ${orderId}`);
+        } catch (error) {
+            console.error('Error rolling back coupon usage:', error);
+        }
     }
 
 
-module.exports = {applyCouponToOrder,validateAndApplyCoupon};
+module.exports = { applyCouponToOrder, validateAndApplyCoupon, rollbackCouponUsage };

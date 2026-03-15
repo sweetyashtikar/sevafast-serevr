@@ -12,6 +12,7 @@ const ShipRocketService = require('../services/shiprocket.service');
 const tezGateway = require('../services/tezPayment.service')
 const {OrderStatus} = require('../models/orders')
 const DeliveryBoy = require('../models/deliveryBoy')
+const CouponService = require('../utils/coupon')
 
 /**
  * ORDER ITEM CRUD CONTROLLER
@@ -269,7 +270,7 @@ const minimumFreeDeliveryAmount =
 
             const orderStatus = payment_method === PaymentMethod.COD 
             ? OrderStatus.PLACED 
-            : OrderStatus.PENDING_PAYMENT;
+            : OrderStatus.PENDING;
 
        const timestamp = Date.now();
         const randomNum = Math.floor(Math.random() * 10000);
@@ -279,7 +280,7 @@ const minimumFreeDeliveryAmount =
         const order = new Order({
             user_id,
             address_id,
-            mobile,
+            mobile: mobile || userAddress.mobile,
             address: address || userAddress.address,
             location: location || userAddress.location,
             total: itemsTotal,
@@ -332,6 +333,10 @@ const minimumFreeDeliveryAmount =
         console.log(" orderItems ", orderItems);
 
         await OrderItem.insertMany(orderItems, { session });
+        
+        // Clear user's cart after successful order creation
+        const Cart = require('../models/cart');
+        await Cart.deleteOne({ userId: user_id }).session(session);
 
         // After successful order creation, update coupon usage
         if (appliedCoupon) {

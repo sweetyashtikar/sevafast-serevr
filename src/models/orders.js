@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const OrderStatus = {
-    PENDING : 'PENDING',
+    PENDING : 'pending',
     PLACED: 'Order placed',
     PROCESSED: 'processed',
     ASSIGNED: 'assigned',     // Added - assigned to delivery boy
