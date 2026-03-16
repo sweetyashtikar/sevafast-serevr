@@ -241,6 +241,68 @@ const LogoutUser = async (req, res) => {
   }
 };
 
+
+const RegisterVendor = async (req, res) => {
+  try {
+    const { username, email, mobile, password, field_manager } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Username and password are required",
+      });
+    }
+
+    const existingUser = await User.findOne({
+      $or: [{ email }, { mobile }],
+    });
+
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: "User already exists",
+      });
+    }
+
+    const vendorRole = await Role.findOne({ role: "vendor" });
+
+    if (!vendorRole) {
+      return res.status(404).json({
+        success: false,
+        message: "Vendor role not found",
+      });
+    }
+
+    let fieldManagerUser = null;
+
+    if (field_manager && field_manager !== "undefined") {
+      fieldManagerUser = await User.findById(field_manager);
+    }
+
+    const vendor = await User.create({
+      username,
+      email,
+      mobile,
+      password,
+      role: vendorRole._id,
+      field_manager: fieldManagerUser ? fieldManagerUser._id : null,
+      status: false,
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Vendor registered successfully",
+      data: vendor,
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 module.exports = {
   sendEmail,
   LoginUser,
@@ -248,4 +310,6 @@ module.exports = {
   VerifyOTP,
   resetPassword,
   LogoutUser,
+  RegisterVendor,
 };
+

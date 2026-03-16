@@ -469,7 +469,7 @@ class EmailService {
 
     // ✅ Approval Email Template
     getApprovalEmailTemplate(user) {
-        const appUrl = FRONTEND_URL || 'http://localhost:3000';
+        const appUrl = FRONTEND_URL  || 'http://localhost:3000';
         const userName = user.name || user.username || user.email;
         
         return `
