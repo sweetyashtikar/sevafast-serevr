@@ -59,6 +59,14 @@ const validateAndApplyCoupon = async (couponCode, userId, orderAmount, items = [
             throw new Error(`You can only use this coupon ${coupon.perUserUsageLimit} time(s)`);
         }
 
+        // Check user-specific restrictions (e.g., for referral rewards)
+        if (coupon.userIds && coupon.userIds.length > 0) {
+            const isUserAuthorized = coupon.userIds.some(id => id.toString() === userId.toString());
+            if (!isUserAuthorized) {
+                throw new Error('This coupon is not valid for your account');
+            }
+        }
+
         // Calculate discount
         let discountAmount = 0;
         if (coupon.discountType === 'percentage') {

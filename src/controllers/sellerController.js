@@ -2,6 +2,8 @@ const Seller = require('../models/seller');
 const User = require('../models/User');
 const Category = require('../models/category');
 const Zipcode = require('../models/zipcode');
+const Coupon = require('../models/coupons');
+const { issueReferralReward } = require('../utils/referral');
 const mongoose = require('mongoose')
 
 
@@ -735,17 +737,22 @@ const updateSellerStatus = async (req, res) => {
 
         await seller.save({ session });
 
-        await session.commitTransaction();
-        session.endSession();
-
         // Send notification based on status change
         if (status === 'approved') {
             // Send approval notification
             console.log(`Seller ${seller._id} approved. Notifying user ${seller.user_id}`);
+
+            // --- Referral Reward Logic ---
+            await issueReferralReward(seller.user_id, session);
+            // -----------------------------
+
         } else if (status === 'deactive' || status === 'removed') {
             // Send deactivation/removal notification
             console.log(`Seller ${seller._id} status changed to ${status}. Reason: ${reason}`);
         }
+
+        await session.commitTransaction();
+        session.endSession();
 
         res.status(200).json({
             success: true,

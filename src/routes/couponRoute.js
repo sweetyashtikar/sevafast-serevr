@@ -115,7 +115,7 @@ router.post('/validate',
 );
 
 // Get active coupons for current user
-router.get('/active', couponController.getActiveCoupons);
+router.get('/active', authenticate, couponController.getActiveCoupons);
 
 // ==================== ADMIN ROUTES ====================
 

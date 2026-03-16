@@ -384,6 +384,7 @@
 const nodemailer = require('nodemailer');
 const { GOOGLE_SMTP_HOST, GOOGLE_SMTP_PORT, GOOGLE_SMTP_USER, GOOGLE_SMTP_PASS, GOOGLE_FROM_NAME, FRONTEND_URL } = require('../env-variables');
 
+
 const generateOTP = () => {
     return Math.floor(100000 + Math.random() * 900000);
 };

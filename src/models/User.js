@@ -48,6 +48,7 @@ const userSchema = new mongoose.Schema(
     country_code: { type: Number },
     referral_code: { type: String },
     friends_code: { type: String },
+    referral_reward_issued: { type: Boolean, default: false },
 
     // --- Location & Address (Grouped) ---
     address_info: {
@@ -83,8 +84,8 @@ field_manager: {
 );
 
 
-// PRE-SAVE HOOK: Hash password before saving to DB
-userSchema.pre("save", async function (next) {
+// PRE-SAVE HOOK: Hash password and generate referral code
+userSchema.pre("save", async function () {
   // 1. Handle Password Hashing
   if (this.isModified("password")) {
     try {
@@ -92,25 +93,38 @@ userSchema.pre("save", async function (next) {
       this.password = await bcrypt.hash(this.password, salt);
     } catch (error) {
       console.log(error);
-      return next(error);
+      throw error; // Throw instead of next(error) for async
+    }
+  }
+
+  // 2. Generate Referral Code for Vendors
+  if (this.isNew && !this.referral_code) {
+    try {
+      const Role = mongoose.model("Role");
+      const vendorRole = await Role.findOne({ role: 'vendor' });
+      
+      if (vendorRole && this.role && this.role.toString() === vendorRole._id.toString()) {
+        const randomStr = Math.random().toString(36).substring(2, 5).toUpperCase();
+        const usernamePart = this.username ? this.username.replace(/\s+/g, '').substring(0, 5).toUpperCase() : 'USER';
+        this.referral_code = `VF-${usernamePart}-${randomStr}`;
+      }
+    } catch (error) {
+      console.error("Error generating referral code:", error);
     }
   }
 });
 
 // Pre-save hook specifically for security updates
-userSchema.pre("save", async function (next) {
+userSchema.pre("save", async function () {
   // Handle OTP Hashing
   if (this.isModified("security.forgotten_password_code")) {
     try {
-      // Check if security object and OTP exist
       if (
         this.security && 
         this.security.forgotten_password_code && 
         typeof this.security.forgotten_password_code === 'string'
       ) {
-        // Check if it's already hashed
         const isAlreadyHashed = /^\$2[aby]\$/.test(this.security.forgotten_password_code);
-        
         if (!isAlreadyHashed) {
           const salt = await bcrypt.genSalt(10);
           this.security.forgotten_password_code = await bcrypt.hash(
@@ -121,7 +135,7 @@ userSchema.pre("save", async function (next) {
       }
     } catch (error) {
       console.log("OTP hashing error:", error);
-      return next(error);
+      throw error;
     }
   }
 });

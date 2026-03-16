@@ -2,6 +2,7 @@ const mongoose = require('mongoose')
 const express = require('express');
 const router = express.Router();
 const { emailService } = require('../utils/sendmail');
+const { issueReferralReward } = require('../utils/referral');
 
 router.patch('/:model/:id', async (req, res) => {
     try {
@@ -40,6 +41,11 @@ router.patch('/:model/:id', async (req, res) => {
                 },
                 { new: true, runValidators: true }
             )
+
+            // Trigger referral reward if approving a user
+            if (isApprovingUser) {
+                await issueReferralReward(id);
+            }
             if (!updateStatus) {
                 return res.status(404).json({
                     success: false,
