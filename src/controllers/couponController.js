@@ -576,18 +576,34 @@ exports.validateCoupon = async (req, res) => {
 exports.getActiveCoupons = async (req, res) => {
     try {
         const { userId, orderAmount } = req.query;
+        // Identify the user for filtering (either from query or authenticated session)
+        const activeUserId = userId || req.user?._id || req.user?.id;
         const now = new Date();
 
-        // Find all active and valid coupons
-        const coupons = await Coupon.find({
+        // Build the query
+        const query = {
             status: true,
             startDate: { $lte: now },
             expiryDate: { $gte: now },
-            $or: [
-                { totalUsageLimit: null },
-                { totalUsedCount: { $lt: '$totalUsageLimit' } }
+            $and: [
+                {
+                    $or: [
+                        { totalUsageLimit: null },
+                        { $expr: { $lt: ["$totalUsedCount", "$totalUsageLimit"] } }
+                    ]
+                },
+                {
+                    $or: [
+                        { userIds: { $size: 0 } }, // Public coupons
+                        { userIds: { $exists: false } }, // Also public
+                        ...(activeUserId ? [{ userIds: new mongoose.Types.ObjectId(activeUserId.toString()) }] : []) // User-specific coupons
+                    ]
+                }
             ]
-        }).lean();
+        };
+
+        // Find all active and valid coupons
+        const coupons = await Coupon.find(query).lean();
 
         // Filter coupons based on user and order amount
         const validCoupons = await Promise.all(coupons.map(async (coupon) => {
@@ -596,14 +612,14 @@ exports.getActiveCoupons = async (req, res) => {
                 return null;
             }
 
-            // Check user type if userId provided
-            if (userId) {
+            // Check user type if a user ID is available
+            if (activeUserId) {
                 if (coupon.userType === 'new') {
-                    const orderCount = await Order.countDocuments({ user_id: userId });
+                    const orderCount = await Order.countDocuments({ user_id: activeUserId });
                     if (orderCount > 0) return null;
                 }
                 if (coupon.userType === 'existing') {
-                    const orderCount = await Order.countDocuments({ user_id: userId });
+                    const orderCount = await Order.countDocuments({ user_id: activeUserId });
                     if (orderCount === 0) return null;
                 }
             }

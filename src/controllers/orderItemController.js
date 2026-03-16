@@ -12,7 +12,9 @@ const ShipRocketService = require('../services/shiprocket.service');
 const tezGateway = require('../services/tezPayment.service')
 const {OrderStatus} = require('../models/orders')
 const DeliveryBoy = require('../models/deliveryBoy')
-const CouponService = require('../utils/coupon')
+const CouponService = require('../utils/coupon');
+const UserSubscription = require('../models/userSubscription');
+const Subscription = require('../models/subscription');
 
 /**
  * ORDER ITEM CRUD CONTROLLER
@@ -255,11 +257,35 @@ const minimumFreeDeliveryAmount =
 
         const promoDiscount = parseFloat(promo_details?.discount)  || couponDiscount || 0;
 
-        // Determine final delivery charge based on minimum free delivery amount
-        let finalDeliveryCharge = areaDeliveryCharge;
-        if (minimumFreeDeliveryAmount > 0 && itemsTotal >= minimumFreeDeliveryAmount) {
-            finalDeliveryCharge = 0; // Free delivery if order meets minimum
+        // Determine final delivery charge based on Threshold + Subscription rules
+        // Rule 1: Threshold-based free delivery (e.g. 499)
+        const threshold = parseFloat(userAddress?.area_id?.minimum_free_delivery_order_amount ?? 499);
+        let finalDeliveryCharge = (itemsTotal >= threshold) ? 0 : areaDeliveryCharge;
+        let subscriptionBenefitUsed = false;
+
+        // Rule 2: Override with Subscription Benefits (if not already free by threshold)
+        if (finalDeliveryCharge > 0) {
+            // Fetch active subscription
+            const activeSub = await UserSubscription.findOne({
+                userId: user_id,
+                status: 'active',
+                endDate: { $gt: new Date() }
+            }).populate('subscriptionId');
+
+            if (activeSub && activeSub.subscriptionId) {
+                const subType = activeSub.subscriptionId.type; // 'customer' or 'vendor'
+                
+                if (subType === 'vendor') {
+                    // Rule 3: Vendor sub gets all deliveries free
+                    finalDeliveryCharge = 0;
+                    subscriptionBenefitUsed = true;
+                } else if (subType === 'customer') {
+                    // Rule 2: Customer sub NO LONGER gets free delivery under 499
+                    subscriptionBenefitUsed = false;
+                }
+            }
         }
+        // Rule 1: No subscription (activeSub is null) means always pay areaDeliveryCharge.
 
         // Calculate totals using area delivery charge
         const total = itemsTotal +
@@ -346,6 +372,17 @@ const minimumFreeDeliveryAmount =
                 user_id,
                 couponDiscount
             );
+        }
+
+        // Update subscription usage if benefit was used
+        if (subscriptionBenefitUsed) {
+            await UserSubscription.findOneAndUpdate(
+                { userId: user_id, status: 'active', endDate: { $gt: new Date() } },
+                { 
+                    $inc: { 'usage.freeDeliveriesUsedThisMonth': 1 },
+                    $set: { 'usage.lastBenefitUsedDate': new Date() }
+                }
+            ).session(session);
         }
 
         // Update product stock (important!)

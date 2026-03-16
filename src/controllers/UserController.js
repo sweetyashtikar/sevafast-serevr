@@ -12,8 +12,7 @@ const RegisterUser = async (req, res) => {
             latitude, longitude, address, city, pincode,
             company, fcm_id , zipcodes, vendor_id } = req.body;
            const ip_address = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress || req.ip;
-           console
-
+           
         // 2. Check that at least ONE contact method exists
         if (!email && !mobile) {
             return res.status(400).json({ success: false, message: 'Email or Mobile must be provided' });
@@ -69,7 +68,31 @@ const RegisterUser = async (req, res) => {
                 pincode
             },
             zipcodes : zipcodes || [],
+            friends_code: null
         };
+
+        // 4. Validate Referral Code (friends_code) if role is vendor
+        if (findRole.role === "vendor" && req.body.friends_code) {
+            console.log(`[Signup] Validating referral code: ${req.body.friends_code} for user: ${email || mobile}`);
+            
+            // Find vendor role ID to ensure strictly vendor-to-vendor referral
+            const vendorRole = await Roles.findOne({ role: 'vendor' });
+            
+            if (vendorRole) {
+                const referrer = await User.findOne({ 
+                    referral_code: req.body.friends_code,
+                    role: vendorRole._id // Strict check: Referrer must be a vendor
+                });
+                
+                if (referrer) {
+                    console.log(`[Signup] Valid referral code from vendor: ${referrer.username}`);
+                    userData.friends_code = req.body.friends_code;
+                } else {
+                    console.warn(`[Signup] REJECTED: referral_code '${req.body.friends_code}' not found or not a vendor.`);
+                }
+            }
+        }
+
         if (findRole.role === "customer" || findRole.role === "delivery_boy") {
             userData.status = true;
         }

@@ -2,6 +2,9 @@ const mongoose = require('mongoose');
 const Cart = require('../models/cart');
 const Product = require('../models/products');
 const User = require('../models/User');
+const UserSubscription = require('../models/userSubscription');
+const Subscription = require('../models/subscription');
+const Address = require('../models/address');
 const { PRODUCT_TYPES, STOCK_STATUS } = require('../types/productTypes');
 
 
@@ -404,8 +407,22 @@ const getCart = async (req, res) => {
         const availableItems = processedItems.filter(item => item.available);
         const unavailableItems = processedItems.filter(item => !item.available);
 
+        // Fetch active subscription for the user
+        const activeSub = await UserSubscription.findOne({
+            userId,
+            status: 'active',
+            endDate: { $gt: new Date() }
+        }).populate('subscriptionId');
+
+        // Fetch user's default address for accurate delivery calculation
+        const defaultAddress = await Address.findOne({ userId, is_default: true })
+            .populate({
+                path: 'area_id',
+                select: 'delivery_charges minimum_free_delivery_order_amount'
+            });
+
         // Calculate cart summary using helper function
-        const summary = calculateCartSummary(availableItems);
+        const summary = calculateCartSummary(availableItems, activeSub, defaultAddress);
 
         // Update cart if there are unavailable items (remove them)
         if (unavailableItems.length > 0) {
@@ -1101,11 +1118,41 @@ const moveToWishlist = async (req, res) => {
 /**
  * Helper: Calculate cart summary
  */
-const calculateCartSummary = (items) => {
+const calculateCartSummary = (items, activeSub = null, defaultAddress = null) => {
     const totalItems = items.reduce((sum, item) => sum + item.qty, 0);
     const totalPrice = items.reduce((sum, item) => sum + item.itemTotal, 0);
     const totalDiscount = 0; // Implement discount logic if needed
-    const deliveryCharge = totalPrice > 500 ? 0 : 50; // Example logic
+    
+    // 1. Get Base Delivery Charge and Free Delivery Threshold from Area
+    // Default to 50 charge and 499 threshold if not specified in DB
+    const areaCharge = parseFloat(defaultAddress?.area_id?.delivery_charges ?? 50);
+    const freeDeliveryThreshold = parseFloat(defaultAddress?.area_id?.minimum_free_delivery_order_amount ?? 499);
+    
+    // 2. Initial Delivery Charge calculation based on Threshold
+    let deliveryCharge = totalPrice >= freeDeliveryThreshold ? 0 : areaCharge;
+    let memberBenefitApplied = false;
+
+    // 3. Override with Subscription Benefits
+    if (activeSub && activeSub.subscriptionId) {
+        const subType = activeSub.subscriptionId.type; // 'customer' or 'vendor'
+        
+        // Rule: If already free by threshold, we don't 'use up' a subscription benefit if it's limited
+        if (deliveryCharge > 0) {
+            if (subType === 'vendor') {
+                // Vendors retain their "always free" benefit
+                deliveryCharge = 0;
+                memberBenefitApplied = true;
+            } else if (subType === 'customer') {
+                // IMPORTANT: Customers NO LONGER get free delivery under 499
+                // So we do not override deliveryCharge here for customers.
+                memberBenefitApplied = false;
+            }
+        } else {
+            // Already free by threshold
+            memberBenefitApplied = false; 
+        }
+    }
+
     const finalTotal = totalPrice + deliveryCharge - totalDiscount;
 
     return {
@@ -1114,7 +1161,12 @@ const calculateCartSummary = (items) => {
         totalDiscount,
         deliveryCharge,
         finalTotal,
-        itemsCount: items.length
+        itemsCount: items.length,
+        freeDeliveryThreshold, // Return current threshold for UI display
+        subscriptionBenefit: {
+            isApplied: memberBenefitApplied,
+            activePlanName: activeSub?.subscriptionId?.name || null
+        }
     };
 }
 
