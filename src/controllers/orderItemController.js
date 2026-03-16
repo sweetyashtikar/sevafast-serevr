@@ -1834,6 +1834,108 @@ const getOrderItemsByOrder = async (req, res) => {
     }
 };
 
+//get all order items by status 
+const getOrdersByStatus = async (req, res) => {
+    try {
+        const { status } = req.params; // or req.query depending on how you send it
+        const vendorId = req.user._id; // Assuming vendor is logged in
+
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const skip = (page - 1) * limit;
+
+        console.log("Fetching orders with status:", status);
+
+        const VALID_STATUSES = ['awaiting', 'processed','confirmed', 'shipped', 'delivered', 'cancelled', 'returned'];
+
+        if (status && status !== 'all' && !VALID_STATUSES.includes(status)) {
+            return res.status(400).json({ success: false, message: "Invalid status value" });
+        }
+
+        // First, find all order items for this vendor with the given status
+        const orderItemsQuery = { seller_id: vendorId };
+
+        // Add status filter if provided
+        if (status && status !== 'all') {
+            orderItemsQuery.status = status;
+        }
+
+        const orderItems = await OrderItem.find(orderItemsQuery)
+            .populate('product_id', 'name mainImage simpleProduct variants') // Populate product details
+            .sort({ date_added: -1 }) // Most recent first
+            .skip(skip)
+            .limit(limit)
+            .lean()
+
+        console.log(`Found ${orderItems.length} order items`);
+
+        if (orderItems.length === 0) {
+            return res.status(200).json({
+                success: true,
+                message: "No orders found",
+                data: []
+            });
+        }
+
+        // Get unique order IDs from the order items
+        const orderIds = [...new Set(orderItems.map(item => item.order_id.toString()))];
+
+        // Fetch the corresponding orders
+        const orders = await Order.find({
+            _id: { $in: orderIds }
+        }).populate('user_id', 'name email mobile'); // Populate user details
+
+        // Create a map of orders for easy lookup
+        const orderMap = {};
+        orders.forEach(order => {
+            orderMap[order._id.toString()] = order;
+        });
+
+        // Group order items by order
+        const ordersWithItems = [];
+        const orderGroups = {};
+
+        orderItems.forEach(item => {
+            const orderId = item.order_id.toString();
+            if (!orderGroups[orderId]) {
+                orderGroups[orderId] = {
+                    order: orderMap[orderId],
+                    items: []
+                };
+            }
+            orderGroups[orderId].items.push(item);
+        });
+
+        // Convert the grouped object to an array
+        Object.keys(orderGroups).forEach(orderId => {
+            if (orderGroups[orderId].order) {
+                ordersWithItems.push({
+                    ...orderGroups[orderId].order,
+                    items: orderGroups[orderId].items
+                });
+            }
+        });
+
+        // Sort by date (most recent first)
+        ordersWithItems.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+        res.status(200).json({
+            success: true,
+            message: "Orders fetched successfully",
+            data: ordersWithItems,
+            count: ordersWithItems.length
+        });
+
+    } catch (error) {
+        console.error("Error fetching orders by status:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to fetch orders",
+            error: error.message
+        });
+    }
+};
+
 // 6. UPDATE - Update order item status
 const updateOrderItemStatus = async (req, res) => {
     const session = await mongoose.startSession();
@@ -4134,5 +4236,6 @@ module.exports = {
     updateOrderStatus,
     assignDeliveryBoy,
     verifyDeliveryOTP,
-    getVendorOrderAnalytics
+    getVendorOrderAnalytics,
+    getOrdersByStatus
 }

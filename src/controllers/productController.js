@@ -124,7 +124,7 @@ const addProduct = async (req, res) => {
       ...mapInventory(parsedBody, toInt),
       ...mapProductType(parsedBody),
       ...mapShipping(parsedBody),
-      ...mapDimensions(parsedBody,toFloat),
+      ...mapDimensions(parsedBody, toFloat),
       ...mapPolicies(parsedBody),
       ...mapDigitalProduct(parsedBody),
       mainImage: mainImageUrl,
@@ -134,7 +134,7 @@ const addProduct = async (req, res) => {
     };
 
     // addProductTypeData(productData, parsedBody,toInt, toFloat,toArray);
-addProductTypeData(productData, parsedBody, toInt, toFloat, toArray, req.files);
+    addProductTypeData(productData, parsedBody, toInt, toFloat, toArray, req.files);
 
     const product = new Product(productData);
     await product.save();
@@ -271,7 +271,7 @@ const updateProduct = async (req, res) => {
       // Update other images if new ones uploaded
       if (req.files.otherImages && req.files.otherImages.length > 0) {
         const newImages = req.files.otherImages.map(file => file.path);
-        
+
         // Handle existing images
         if (body.existingOtherImages) {
           const existingImages = JSON.parse(body.existingOtherImages);
@@ -279,7 +279,7 @@ const updateProduct = async (req, res) => {
         } else {
           otherImageUrls = newImages;
         }
-      }else if (body.existingOtherImages) {
+      } else if (body.existingOtherImages) {
         // No new images, but keep existing ones
         const existingImages = JSON.parse(body.existingOtherImages);
         otherImageUrls = existingImages.map(img => img.url);
@@ -289,9 +289,9 @@ const updateProduct = async (req, res) => {
       const existingImages = JSON.parse(body.existingOtherImages);
       otherImageUrls = existingImages.map(img => img.url);
     }
-    
 
-  // Parse JSON fields
+
+    // Parse JSON fields
     const parsedBody = {
       ...body,
       simpleProduct: body.simpleProduct ? JSON.parse(body.simpleProduct) : existingProduct.simpleProduct,
@@ -340,11 +340,11 @@ const updateProduct = async (req, res) => {
     const updateData = {
       ...mapBasicInfo(parsedBody),
       ...mapCategorization(parsedBody, parsedBody.categoryId || existingProduct.categoryId),
-      ...mapTaxPricing(parsedBody,toBool),
-      ...mapInventory(parsedBody,toInt),
+      ...mapTaxPricing(parsedBody, toBool),
+      ...mapInventory(parsedBody, toInt),
       ...mapProductType(parsedBody),
       ...mapShipping(parsedBody),
-      ...mapDimensions(parsedBody,toFloat),
+      ...mapDimensions(parsedBody, toFloat),
       ...mapPolicies(parsedBody),
       ...mapDigitalProduct(parsedBody),
       mainImage: mainImageUrl,
@@ -467,7 +467,7 @@ const getProductById = async (req, res) => {
 //get all products irrespective of status and isApproved for admin
 const getAllProducts = async (req, res) => {
   try {
-     const {
+    const {
       page = 1,
       limit = 20,
       category,
@@ -482,23 +482,23 @@ const getAllProducts = async (req, res) => {
       sortOrder = "desc",
       inStock,
       deliverableZipcodes,
-      status, 
+      status,
       isApproved
     } = req.query;
 
     const query = {};
-    if(status !== undefined && status !== ""){
-        query.status = status === "true";
+    if (status !== undefined && status !== "") {
+      query.status = status === "true";
     }
-      if(isApproved !== undefined && isApproved !== ""){
+    if (isApproved !== undefined && isApproved !== "") {
       query.isApproved = isApproved === "true";
     }
 
-     // Category filter
+    // Category filter
     if (category) {
       query.categoryId = category;
     }
-     // Vendor filter
+    // Vendor filter
     if (vendor) {
       query.vendorId = vendor;
     }
@@ -512,7 +512,7 @@ const getAllProducts = async (req, res) => {
     if (brand) {
       query.brand = brand;
     }
-     if (deliverableZipcodes) {
+    if (deliverableZipcodes) {
       query.$and = [
         { isDeleted: false }, // Maintain existing base query
         {
@@ -529,23 +529,23 @@ const getAllProducts = async (req, res) => {
       query.indicator = parseInt(indicator);
     }
 
-     // Product type filter
+    // Product type filter
     if (productType) {
       query.productType = productType;
     }
 
     if (minPrice || maxPrice) {
-  query.effectivePrice = {};
-  if (minPrice) query.effectivePrice.$gte = parseFloat(minPrice);
-  if (maxPrice) query.effectivePrice.$lte = parseFloat(maxPrice);
-}
+      query.effectivePrice = {};
+      if (minPrice) query.effectivePrice.$gte = parseFloat(minPrice);
+      if (maxPrice) query.effectivePrice.$lte = parseFloat(maxPrice);
+    }
 
     // Add this to your query building
-if (inStock !== undefined && inStock !== "") {
-  query.inStock = inStock === "true";
-}
+    if (inStock !== undefined && inStock !== "") {
+      query.inStock = inStock === "true";
+    }
 
-        const sort = {};
+    const sort = {};
     sort[sortBy] = sortOrder === "asc" ? 1 : -1;
 
     // Pagination
@@ -574,7 +574,7 @@ if (inStock !== undefined && inStock !== "") {
       .skip(skip)
       .limit(parseInt(limit));
 
-       const total = await Product.countDocuments(query);
+    const total = await Product.countDocuments(query);
 
 
     res.status(200).json({
@@ -642,9 +642,9 @@ const getAllProductsWithFilters = async (req, res) => {
     }
 
     // Search filter (text search)
-   if (search) {
-  query.name = { $regex: search, $options: 'i' };
-}
+    if (search) {
+      query.name = { $regex: search, $options: 'i' };
+    }
 
     // Price range filter (for simple products)
     if (minPrice || maxPrice) {
@@ -751,7 +751,7 @@ const getAllProductsWithFilters = async (req, res) => {
 const getVendorProducts = async (req, res) => {
   try {
     const vendorId = req.user._id;
-    const { limit, offset, sort, searchQuery, filters,skip } = req.paginationQuery;
+    const { limit, offset, sort, searchQuery, filters, skip } = req.paginationQuery;
 
     // Build query
     const query = {
@@ -965,13 +965,23 @@ const updateProductStatus = async (req, res) => {
 const updateProductStock = async (req, res) => {
   try {
     const { productId } = req.params;
-    const { stock, variantIds } = req.body;
+    const {
+      variantIds,
+      adjustmentType,
+      quantity,
+      reason,
+      notes
+    } = req.body;
+    console.log("req.body of stock update", req.body)
+
     const vendorId = req.user._id;
 
     const product = await Product.findOne({
       _id: productId,
       vendorId,
       isDeleted: false,
+      status: true,
+      isApproved: true
     });
 
     if (!product) {
@@ -981,42 +991,186 @@ const updateProductStock = async (req, res) => {
       });
     }
 
-    // Update simple product stock
-    if (product.productType === PRODUCT_TYPES.SIMPLE) {
-      product.simpleProduct.sp_totalStock = parseInt(stock);
-      product.simpleProduct.sp_stockStatus =
-        parseInt(stock) > 0 ? STOCK_STATUS.IN_STOCK : STOCK_STATUS.OUT_OF_STOCK;
+    let oldStock = 0;
+    let newStock = 0;
+    let stockStatus = "";
+    let updatedEntity = "";
+
+    // Parse quantity safely
+    const parsedQuantity = quantity !== undefined && quantity !== null && quantity !== ''
+      ? parseInt(quantity)
+      : 0;
+
+    // Validate parsed quantity
+    if (isNaN(parsedQuantity)) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid quantity is required",
+      });
     }
 
-    // Update variable product stock
-    if (product.productType === PRODUCT_TYPES.VARIABLE) {
-      if (product.variantStockLevelType === STOCK_LEVEL_TYPES.PRODUCT_LEVEL) {
-        product.productLevelStock.totalStock = parseInt(stock);
-        product.productLevelStock.stockStatus =
-          parseInt(stock) > 0
-            ? STOCK_STATUS.IN_STOCK
-            : STOCK_STATUS.OUT_OF_STOCK;
+    // Check if quantity is negative
+    if (parsedQuantity < 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Quantity cannot be negative",
+      });
+    }
+
+    // Update simple product stock
+    if (product.productType === PRODUCT_TYPES.SIMPLE) {
+      oldStock = product.simpleProduct.sp_totalStock || 0;
+      updatedEntity = "simple_product";
+
+      // Calculate new stock based on adjustment type
+      if (adjustmentType === "increase_by") {
+        newStock = oldStock + parsedQuantity;
+      }
+      else if (adjustmentType === "decrease_by") {
+        newStock = Math.max(0, oldStock - parsedQuantity);
+      }
+      else {
+        // If no adjustment type specified, use absolute quantity value
+        newStock = parsedQuantity;
+      }
+
+      // Ensure newStock is a valid number
+      if (isNaN(newStock)) {
+        newStock = oldStock;
+      }
+
+      product.simpleProduct.sp_totalStock = newStock;
+      product.simpleProduct.sp_stockStatus =
+        newStock > 0 ? STOCK_STATUS.IN_STOCK : STOCK_STATUS.OUT_OF_STOCK;
+      stockStatus = product.simpleProduct.sp_stockStatus;
+    }
+
+    // Update variable product stock - PRODUCT LEVEL
+    else if (product.productType === PRODUCT_TYPES.VARIABLE &&
+      product.variantStockLevelType === VARIANT_STOCK_LEVEL_TYPES.PRODUCT_LEVEL) {
+
+      oldStock = product.productLevelStock.pls_totalStock || 0;
+      updatedEntity = "product_level";
+
+      // Calculate new stock based on adjustment type
+      if (adjustmentType === "increase_by") {
+        newStock = oldStock + parsedQuantity;
+      }
+      else if (adjustmentType === "decrease_by") {
+        newStock = Math.max(0, oldStock - parsedQuantity);
+      }
+      else {
+        newStock = parsedQuantity;
+      }
+
+      // Ensure newStock is a valid number
+      if (isNaN(newStock)) {
+        newStock = oldStock;
+      }
+
+      product.productLevelStock.pls_totalStock = newStock;
+      product.productLevelStock.pls_stockStatus =
+        newStock > 0 ? STOCK_STATUS.IN_STOCK : STOCK_STATUS.OUT_OF_STOCK;
+      stockStatus = product.productLevelStock.pls_stockStatus;
+    }
+
+    // Update variable product stock - VARIANT LEVEL
+    else if (product.productType === PRODUCT_TYPES.VARIABLE &&
+      product.variantStockLevelType === VARIANT_STOCK_LEVEL_TYPES.VARIANT_LEVEL) {
+
+      if (!variantIds) {
+        return res.status(400).json({
+          success: false,
+          message: "variantIds is required for variant level stock update",
+        });
+      }
+
+      // Find the specific variant
+      const variant = product.variants.find(
+        (v) => v._id.toString() === variantIds
+      );
+
+      if (!variant) {
+        return res.status(404).json({
+          success: false,
+          message: "Variant not found",
+        });
+      }
+
+      oldStock = variant.variant_totalStock || 0;
+      updatedEntity = `variant_${variant._id}`;
+
+      // Calculate new stock based on adjustment type
+      if (adjustmentType === "increase_by") {
+        newStock = oldStock + parsedQuantity;
+      }
+      else if (adjustmentType === "decrease_by") {
+        newStock = Math.max(0, oldStock - parsedQuantity);
+      }
+      else {
+        newStock = parsedQuantity;
+      }
+
+      // Ensure newStock is a valid number
+      if (isNaN(newStock)) {
+        newStock = oldStock;
+      }
+
+      variant.variant_totalStock = newStock;
+      variant.variant_stockStatus =
+        newStock > 0 ? STOCK_STATUS.IN_STOCK : STOCK_STATUS.OUT_OF_STOCK;
+      stockStatus = variant.variant_stockStatus;
+    }
+
+    else {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid product type or stock level configuration",
+      });
+    }
+
+    // Add notes to product if provided
+    if (notes || reason) {
+      const timestamp = new Date().toLocaleString();
+      const adjustmentTypeText = adjustmentType === "increase_by" ? "Increased by" :
+        adjustmentType === "decrease_by" ? "Decreased by" :
+          "Set to";
+
+      const adjustmentNote = `[${timestamp}] Stock ${adjustmentTypeText}: ${oldStock} → ${newStock} (Qty: ${parsedQuantity})${reason ? ` - Reason: ${reason}` : ''}${notes ? ` - Notes: ${notes}` : ''}`;
+      if (product.notes) {
+        product.notes = product.notes + '\n' + adjustmentNote;
       } else {
-        const variant = product.variants.find(
-          (v) => v.variantIds === variantIds
-        );
-        if (variant) {
-          variant.totalStock = parseInt(stock);
-          variant.stockStatus =
-            parseInt(stock) > 0
-              ? STOCK_STATUS.IN_STOCK
-              : STOCK_STATUS.OUT_OF_STOCK;
-        }
+        product.notes = adjustmentNote;
       }
     }
 
+    // Update the updatedAt timestamp
+    product.updatedAt = new Date();
+
     await product.save();
+
+    // Prepare response data
+    const responseData = {
+      product,
+      stockUpdate: {
+        old_stock: oldStock,
+        new_stock: newStock,
+        adjustmentType: adjustmentType || (newStock > oldStock ? "increase_by" : newStock < oldStock ? "decrease_by" : "no_change"),
+        quantity: parsedQuantity,
+        reason: reason || null,
+        notes: notes || null,
+        updated_entity: updatedEntity,
+        stock_status: stockStatus,
+        updated_at: new Date()
+      }
+    };
 
     res.status(200).json({
       success: true,
       message: "Stock updated successfully",
-      data: { product },
+      data: responseData,
     });
+
   } catch (error) {
     console.error("Update stock error:", error);
     res.status(500).json({
