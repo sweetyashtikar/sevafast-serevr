@@ -552,23 +552,30 @@ productSchema.virtual("discountPercentage").get(function () {
 
 productSchema.virtual("inStock").get(function () {
   if (this.productType === PRODUCT_TYPES.SIMPLE) {
-    // One point of truth for simple: status indicator (ignore count)
-    return this.simpleProduct?.sp_stockStatus === STOCK_STATUS.IN_STOCK;
+    // Check both status indicator and actual count
+    return (
+      this.simpleProduct?.sp_stockStatus === STOCK_STATUS.IN_STOCK &&
+      (this.simpleProduct?.sp_totalStock || 0) > 0
+    );
   }
   if (this.productType === PRODUCT_TYPES.VARIABLE) {
     let statusOk = false;
     if (this.variantStockLevelType === VARIANT_STOCK_LEVEL_TYPES.PRODUCT_LEVEL) {
-      // Product level indicator
-      statusOk = this.productLevelStock?.pls_stockStatus === STOCK_STATUS.IN_STOCK;
+      // Product level indicator and count
+      statusOk =
+        this.productLevelStock?.pls_stockStatus === STOCK_STATUS.IN_STOCK &&
+        (this.productLevelStock?.pls_totalStock || 0) > 0;
     } else {
-      // Variant level indicators - check if any variant is marked in-stock
-      statusOk = this.variants?.some((v) => v.variant_isActive && v.variant_stockStatus === STOCK_STATUS.IN_STOCK);
+      // Variant level indicators - check if any variant is marked in-stock AND has qty > 0
+      statusOk = this.variants?.some(
+        (v) =>
+          v.variant_isActive &&
+          v.variant_stockStatus === STOCK_STATUS.IN_STOCK &&
+          (v.variant_totalStock || 0) > 0
+      );
     }
-    
-    // For ALL variable products: force out-of-stock if ALL variants have 0 qty
-    const totalVariantQty = this.variants?.reduce((sum, v) => sum + (v.variant_totalStock || 0), 0) || 0;
-    
-    return statusOk && totalVariantQty > 0;
+
+    return statusOk;
   }
   // Digital products - always in stock
   if (this.productType === PRODUCT_TYPES.DIGITAL) {

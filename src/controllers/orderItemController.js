@@ -388,7 +388,7 @@ const minimumFreeDeliveryAmount =
         // Update product stock (important!)
         for (const item of itemsWithDetails) {
             const product = await Product.findById(item.product_id).session(session);
-  const itemTotalRevenue = item.price * item.quantity;
+            const itemTotalRevenue = item.price * item.quantity;
 
             if (product.productType === PRODUCT_TYPES.SIMPLE|| product.productType === PRODUCT_TYPES.DIGITAL) {
                 product.simpleProduct.sp_totalStock -= item.quantity;
@@ -414,6 +414,94 @@ const minimumFreeDeliveryAmount =
                     product.totalRevenue += itemTotalRevenue;
                 }
             }
+
+            // --- Vendor Cashback & Level Progression Logic ---
+            const VendorLevel = require('../models/vendorLevel');
+            const WalletTransaction = require('../models/walletTransaction');
+            const UserSubscription = require('../models/userSubscription');
+            const Seller = require('../models/seller');
+            const Wallet = require('../models/wallet');
+
+            console.log(`[Cashback] Processing item for seller: ${item.seller_id}`);
+
+            // 1. Cashback logic runs directly from vendor's UserId (no Seller record required)
+            const vendorSub = await UserSubscription.findOne({
+                userId: item.seller_id,
+                status: 'active',
+                endDate: { $gt: new Date() }
+            }).populate('subscriptionId');
+
+            if (vendorSub && vendorSub.subscriptionId?.type === 'vendor') {
+                console.log(`[Cashback] Active vendor subscription found: ${vendorSub.subscriptionId.name}`);
+
+                // Fetch all active levels for THIS SPECIFIC SUBSCRIPTION sorted by threshold
+                const levels = await VendorLevel.find({
+                    subscriptionId: vendorSub.subscriptionId._id,
+                    isActive: true
+                }).sort({ salesThreshold: 1 }).session(session);
+
+                console.log(`[Cashback] Found ${levels.length} levels for this subscription`);
+
+                // Determine cumulative sales volume for level matching
+                const seller = await Seller.findOne({ user_id: item.seller_id }).session(session);
+                const currentVolume = seller ? (seller.totalSalesVolume + item.sub_total) : item.sub_total;
+
+                // Find the highest level the vendor qualifies for
+                let currentLevel = null;
+                let levelIdx = 0;
+                for (let i = 0; i < levels.length; i++) {
+                    if (currentVolume >= levels[i].salesThreshold) {
+                        currentLevel = levels[i];
+                        levelIdx = i + 1;
+                    } else {
+                        break;
+                    }
+                }
+
+                // Update Seller analytics if record exists
+                // if (seller) {
+                //     seller.totalSalesVolume += item.sub_total;
+                //     seller.currentLevelIdx = levelIdx;
+                //     await seller.save({ session });
+                //     console.log(`[Cashback] Updated seller analytics. New volume: ${seller.totalSalesVolume}`);
+                // } else {
+                //     console.log(`[Cashback] No Seller record found — skipping analytics update, but still processing cashback.`);
+                // }
+
+                // Apply Cashback if level entitles to any
+                if (currentLevel && currentLevel.cashbackPercentage > 0) {
+                    const cashbackAmount = (item.sub_total * currentLevel.cashbackPercentage) / 100;
+                    console.log(`[Cashback] Level: ${currentLevel.levelName}, Percentage: ${currentLevel.cashbackPercentage}%, Amount: ${cashbackAmount}`);
+
+                    if (cashbackAmount > 0) {
+                        // Credit the dedicated Wallet (creates one if not exists)
+                        const wallet = await Wallet.findOneAndUpdate(
+                            { userId: item.seller_id },
+                            {
+                                $inc: { balance: cashbackAmount, totalCashReceived: cashbackAmount },
+                                $setOnInsert: { userId: item.seller_id }
+                            },
+                            { upsert: true, new: true, session }
+                        );
+                        console.log(`[Cashback] Wallet credited. New balance: ${wallet.balance}`);
+
+                        // Log Transaction
+                        const transaction = new WalletTransaction({
+                            user_id: item.seller_id,
+                            type: 'credit',
+                            amount: cashbackAmount,
+                            message: `Cashback rewards for Order #${order.order_number} (${currentLevel.levelName} Level: ${currentLevel.cashbackPercentage}%)`,
+                            status: 'success'
+                        });
+                        await transaction.save({ session });
+                    }
+                } else {
+                    console.log(`[Cashback] Sales volume (${currentVolume}) hasn't reached any level threshold yet, or no cashback set.`);
+                }
+            } else {
+                console.log(`[Cashback] No active vendor subscription found for seller: ${item.seller_id}`);
+            }
+
 
             await product.save({ session });
         }
@@ -3924,30 +4012,26 @@ const updateOrderTotals = async (orderId, session) => {
 // Helper function to refund to user's wallet
 const refundToUserWallet = async (userId, amount, order, orderItem, session) => {
     try {
-        // Find user
-        const user = await User.findById(userId).session(session);
-        if (!user) {
-            throw new Error('User not found');
-        }
+        const Wallet = require('../models/wallet');
+        const WalletTransaction = require('../models/walletTransaction');
+
+        // Increment balance in Wallet (post-save hook will sync to User)
+        const wallet = await Wallet.findOneAndUpdate(
+            { userId: userId },
+            { $inc: { balance: amount } },
+            { upsert: true, new: true, session }
+        );
 
         // Create wallet transaction
         const walletTransaction = await WalletTransaction.create([{
             user_id: userId,
-            order_id: order._id,
-            order_item_id: orderItem._id,
-            type: 'refund',
+            type: 'credit', // Type is 'credit' for refund (adding money)
             amount: amount,
-            balance_before: user.wallet_balance || 0,
-            balance_after: (user.wallet_balance || 0) + amount,
-            description: `Refund for cancelled order item: ${orderItem.product_name}`,
-            status: 'completed'
+            message: `Refund for cancelled order item: ${orderItem.product_name} (Order #${order.order_number})`,
+            status: 'success'
         }], { session });
 
-        // Update user's wallet balance
-        user.wallet_balance = (user.wallet_balance || 0) + amount;
-        await user.save({ session });
-
-        console.log(`Refunded ${amount} to user ${userId}'s wallet`);
+        console.log(`Refunded ${amount} to user ${userId}'s wallet. New balance: ${wallet.balance}`);
         return walletTransaction[0];
 
     } catch (error) {

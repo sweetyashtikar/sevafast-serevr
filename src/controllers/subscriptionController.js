@@ -221,3 +221,146 @@ exports.getActiveSubscription = async (req, res) => {
     });
   }
 };
+
+// ==================== ADMIN CONTROLLERS ====================
+
+/**
+ * @desc    Get all subscription plans (Admin)
+ * @route   GET /api/subscriptions/admin/all
+ * @access  Private/Admin
+ */
+exports.adminGetAllSubscriptions = async (req, res) => {
+  try {
+    const subscriptions = await Subscription.find().sort({ createdAt: -1 });
+    res.status(200).json({
+      success: true,
+      data: subscriptions,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch all subscriptions",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * @desc    Create a new subscription plan
+ * @route   POST /api/subscriptions/admin/create
+ * @access  Private/Admin
+ */
+exports.createSubscription = async (req, res) => {
+  try {
+    const { name, type, duration, price, description, features, benefits, isActive } = req.body;
+
+    if (!name || !type || !duration || price === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide name, type, duration, and price",
+      });
+    }
+
+    const subscription = new Subscription({
+      name,
+      type,
+      duration,
+      price,
+      description,
+      features,
+      benefits,
+      isActive,
+    });
+
+    await subscription.save();
+
+    res.status(201).json({
+      success: true,
+      message: "Subscription plan created successfully",
+      data: subscription,
+    });
+  } catch (error) {
+    console.error("Create subscription error:", error);
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+/**
+ * @desc    Update a subscription plan
+ * @route   PUT /api/subscriptions/admin/update/:id
+ * @access  Private/Admin
+ */
+exports.updateSubscription = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const subscription = await Subscription.findByIdAndUpdate(
+      id,
+      req.body,
+      { new: true, runValidators: true }
+    );
+
+    if (!subscription) {
+      return res.status(404).json({
+        success: false,
+        message: "Subscription plan not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Subscription plan updated successfully",
+      data: subscription,
+    });
+  } catch (error) {
+    console.error("Update subscription error:", error);
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+/**
+ * @desc    Delete a subscription plan
+ * @route   DELETE /api/subscriptions/admin/delete/:id
+ * @access  Private/Admin
+ */
+exports.deleteSubscription = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Optional: Check if any user is currently using this subscription
+    const usageCount = await UserSubscription.countDocuments({ subscriptionId: id });
+    if (usageCount > 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot delete plan that is currently in use. Consider deactivating it instead.",
+      });
+    }
+
+    const subscription = await Subscription.findByIdAndDelete(id);
+
+    if (!subscription) {
+      return res.status(404).json({
+        success: false,
+        message: "Subscription plan not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Subscription plan deleted successfully",
+    });
+  } catch (error) {
+    console.error("Delete subscription error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete subscription plan",
+      error: error.message,
+    });
+  }
+};

@@ -3,6 +3,9 @@ const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const { sendEmail, generateOTP } = require("../utils/sendmail");
 const User = require("../models/User");
+const Role = require("../models/roles");
+const Wallet = require("../models/wallet");
+const WalletTransaction = require("../models/walletTransaction");
 const { JWT_SECRET, JWT_EXPIRE, NODE_ENV } = require("../env-variables");
 const { decodeToken, resetToken } = require("../utils/jwt");
 const { sanitizeUser } = require("../utils/sanitizer");
@@ -288,6 +291,9 @@ const RegisterVendor = async (req, res) => {
       field_manager: fieldManagerUser ? fieldManagerUser._id : null,
       status: false,
     });
+
+    // Create wallet for the new vendor
+    await Wallet.getOrCreate(vendor._id);
 
     res.status(201).json({
       success: true,

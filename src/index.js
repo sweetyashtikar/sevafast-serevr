@@ -47,6 +47,8 @@ const StockRoute = require("./routes/stockSalesRoute");
 const LeadRoute = require('./routes/leadRoute')
 const subscriptionRoute = require("./routes/subscriptionRoute");
 const VendorRouter = require('./routes/vendorRoutes');
+const vendorLevelRoute = require("./routes/vendorLevelRoute");
+const walletRoute = require("./routes/walletRoute");
 
 
 /* Middleware */
@@ -109,6 +111,8 @@ app.use("/api/lead",LeadRoute)
 app.use("/api/subscriptions", subscriptionRoute);
 app.use("/api/payments", razorpayRoute);
 app.use("/api/vendor",VendorRouter)
+app.use("/api/vendor-levels", vendorLevelRoute);
+app.use("/api/wallet", walletRoute);
 app.listen(port, () => {
   console.log(`Server is running on port: ${port}`);
 });

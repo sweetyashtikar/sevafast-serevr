@@ -622,11 +622,20 @@ exports.getActiveCoupons = async (req, res) => {
                     const orderCount = await Order.countDocuments({ user_id: activeUserId });
                     if (orderCount === 0) return null;
                 }
+
+                // Filter out single-use coupons already used by this user
+                if (coupon.couponType === 'single time valid') {
+                    const alreadyUsed = await Order.exists({
+                        user_id: activeUserId,
+                        'promo_details.code': coupon.couponCode
+                    });
+                    if (alreadyUsed) return null;
+                }
             }
 
             return {
                 ...coupon,
-                discountDescription: coupon.discountType === 'percentage' 
+                discountDescription: coupon.discountType === 'percentage'
                     ? `${coupon.couponValue}% off${coupon.maxDiscountAmount ? ` (up to ₹${coupon.maxDiscountAmount})` : ''}`
                     : `₹${coupon.couponValue} off`
             };
