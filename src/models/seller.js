@@ -64,6 +64,9 @@ const sellerSchema = new mongoose.Schema({
         required: true 
     }],
     
+    totalSalesVolume: { type: Number, default: 0 },
+    currentLevelIdx: { type: Number, default: 0 }, // 0: No Level, 1: Silver, etc.
+
     status: { 
         type: String, 
         enum: [Status.APPROVED, Status.NOT_APPROVED, Status.DEACTIVE, Status.REMOVED], 

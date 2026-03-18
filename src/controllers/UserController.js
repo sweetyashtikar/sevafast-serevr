@@ -2,6 +2,8 @@ const express = require('express');
 const User = require('../models/User');
 const Roles = require('../models/roles');
 const bcrypt = require('bcryptjs');
+const Wallet = require('../models/wallet');
+const WalletTransaction = require('../models/walletTransaction');
 const {createDeliveryBoyProfile} = require('../controllers/deliveryBoy')
 
 // Create a new user
@@ -10,7 +12,7 @@ const RegisterUser = async (req, res) => {
     try {
         const {  username, email, mobile, password, role, 
             latitude, longitude, address, city, pincode,
-            company, fcm_id , zipcodes, vendor_id } = req.body;
+            company, fcm_id , zipcodes, vendor_id, field_manager } = req.body;
            const ip_address = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress || req.ip;
            
         // 2. Check that at least ONE contact method exists
@@ -68,7 +70,8 @@ const RegisterUser = async (req, res) => {
                 pincode
             },
             zipcodes : zipcodes || [],
-            friends_code: null
+            friends_code: null,
+            field_manager: field_manager || null
         };
 
         // 4. Validate Referral Code (friends_code) if role is vendor
@@ -112,6 +115,11 @@ const RegisterUser = async (req, res) => {
          // If role is delivery_boy, create delivery boy profile
     if (role === 'delivery_boy') {
       delivery_boy_profile = await createDeliveryBoyProfile(newUser._id, vendor_id);
+    }
+
+    // Create wallet for Vendors and Field Managers
+    if (findRole.role === 'vendor' || findRole.role === 'field_manager') {
+        await Wallet.getOrCreate(newUser._id);
     }
 
         res.status(201).json({
