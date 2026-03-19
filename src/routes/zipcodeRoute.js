@@ -21,8 +21,7 @@ router.get('/check/delivery-true', checkZipcodeAvailabilityTrue)
 // Public routes (for checking service availability)
 router.get('/check/:zipcode', checkZipcodeAvailability);
 
-router.route('/:id')
-.get(getZipcodeById)
+router.get('/:cityId', getZipcodesByCity)  // ← हा कधीच reach होत नाही
 .put(updateZipcode)
 .delete(deleteZipcode)
 
