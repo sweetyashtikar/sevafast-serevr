@@ -19,7 +19,8 @@ const {createOrderItem,
     markCommissionAsCredited,
     assignDeliveryBoy,
     verifyDeliveryOTP,
-    getVendorOrderAnalytics
+    getVendorOrderAnalytics,
+    getOrderItemsByStatus
 } = require('../controllers/orderItemController');
 const {
      cancelShipment,
@@ -39,6 +40,9 @@ router.post('/',authenticate,createOrderItem ) // done
 
 //get all order item
 router.get('/',authenticate, checkIfAdmin, getAllOrderItems)//done
+
+//get order items by status
+router.get('/status/:status', authenticate, checkIfAdmin, getOrderItemsByStatus)
 
 //get order Item by Id
 router.get('/:order_id', authenticate,getOrderItemById)//done

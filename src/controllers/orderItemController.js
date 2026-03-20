@@ -1608,7 +1608,18 @@ const getAllOrderItems = async (req, res) => {
 
         // Filter by status
         if (active_status) {
-            query.active_status = active_status;
+            if (active_status === 'Order placed') {
+                query.$or = [
+                    { active_status: 'Order placed' },
+                    { status: 'awaiting' },
+                    { status: 'placed' }
+                ];
+            } else {
+                query.$or = [
+                    { active_status: active_status },
+                    { status: active_status }
+                ];
+            }
         }
 
         // Filter by date range
@@ -4237,7 +4248,140 @@ const sendOrderEmailInBackground = async (order, user, items) => {
 
 
 
+const getOrderItemsByStatus = async (req, res) => {
+    try {
+        const { status } = req.params;
+        const {
+            page = 1,
+            limit = 50,
+            search,
+            sort_by = 'date_added',
+            sort_order = 'desc'
+        } = req.query;
+
+        // Build query
+        const query = {};
+        if (status === 'Order placed') {
+            query.$or = [
+                { active_status: 'Order placed' },
+                { status: 'awaiting' },
+                { status: 'placed' }
+            ];
+        } else {
+            query.$or = [
+                { active_status: status },
+                { status: status }
+            ];
+        }
+
+        // Search in product name or order number
+        if (search) {
+            query.$or = [
+                { product_name: { $regex: search, $options: 'i' } },
+                { 'order_details.order_number': { $regex: search, $options: 'i' } }
+            ];
+        }
+
+        // Calculate pagination
+        const pageNum = parseInt(page);
+        const limitNum = parseInt(limit);
+        const skip = (pageNum - 1) * limitNum;
+
+        // Get total count
+        const total = await OrderItem.countDocuments(query);
+
+        // Determine sort
+        const sort = {};
+        sort[sort_by] = sort_order === 'desc' ? -1 : 1;
+
+        // Get order items with populated data
+        const orderItems = await OrderItem.find(query)
+            .populate('order_id', 'order_number status date_added delivery_info')
+            .populate({
+                path: 'order_id',
+                populate: {
+                    path: 'delivery_info.boy_id',
+                    model: 'User',
+                    select: 'username email mobile name'
+                }
+            })
+            .populate('seller_id', 'username email mobile')
+            .populate('user_id', 'username email')
+            .populate('product_variant_id', 'sku product_id')
+            .populate({
+                path: 'product_variant_id',
+                populate: {
+                    path: 'product_id',
+                    select: 'name category images'
+                }
+            })
+            .sort(sort)
+            .skip(skip)
+            .limit(limitNum)
+            .lean();
+
+        // Transform the data
+        const transformedOrderItems = orderItems.map(item => {
+            const order = item.order_id || {};
+            const deliveryInfo = order.delivery_info || {};
+            const deliveryBoy = deliveryInfo.boy_id || {};
+            
+            return {
+                ...item,
+                order_details: {
+                    order_number: order.order_number,
+                    order_status: order.status,
+                    delivery_info: {
+                        ...deliveryInfo,
+                        boy_name: deliveryBoy.name || deliveryBoy.username || 'Not assigned',
+                        boy_email: deliveryBoy.email,
+                        boy_mobile: deliveryBoy.mobile
+                    }
+                }
+            };
+        });
+
+        // Get summary statistics for this specific status
+        const summary = {
+            total_items: total,
+            total_quantity: await OrderItem.aggregate([
+                { $match: query },
+                { $group: { _id: null, total: { $sum: '$quantity' } } }
+            ]).then(result => result[0]?.total || 0),
+            total_revenue: await OrderItem.aggregate([
+                { $match: query },
+                { $group: { _id: null, total: { $sum: '$sub_total' } } }
+            ]).then(result => result[0]?.total || 0)
+        };
+
+        res.status(200).json({
+            success: true,
+            message: `Order items with status ${status} retrieved successfully`,
+            data: {
+                order_items: transformedOrderItems,
+                summary,
+                pagination: {
+                    current_page: pageNum,
+                    total_pages: Math.ceil(total / limitNum),
+                    total_items: total,
+                    items_per_page: limitNum,
+                    has_next: pageNum < Math.ceil(total / limitNum),
+                    has_previous: pageNum > 1
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error(`Error fetching order items by status ${req.params.status}:`, error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch order items by status'
+        });
+    }
+};
+
 module.exports = {
+
     getSellerPerformance,
     cancelOrderItem,
     markCommissionAsCredited,
@@ -4257,5 +4401,6 @@ module.exports = {
     updateOrderStatus,
     assignDeliveryBoy,
     verifyDeliveryOTP,
-    getVendorOrderAnalytics
+    getVendorOrderAnalytics,
+    getOrderItemsByStatus
 }
