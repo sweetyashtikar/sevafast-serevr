@@ -69,8 +69,11 @@ const orderItemSchema = new mongoose.Schema(
       {
         status: String,
         timestamp: { type: Date, default: Date.now },
+        notes: String,
+        confirmation_image: String,
       },
     ],
+
     updated_by: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   },
   {

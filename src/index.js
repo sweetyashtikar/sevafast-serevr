@@ -49,9 +49,11 @@ const subscriptionRoute = require("./routes/subscriptionRoute");
 const VendorRouter = require('./routes/vendorRoutes');
 const vendorLevelRoute = require("./routes/vendorLevelRoute");
 const walletRoute = require("./routes/walletRoute");
+const deliveryRoutes = require("./routes/deliveryRoutes");
 
 
 /* Middleware */
+
 app.use(
   cors({
     origin: process.env.FRONTEND_URL,
@@ -113,6 +115,8 @@ app.use("/api/payments", razorpayRoute);
 app.use("/api/vendor",VendorRouter)
 app.use("/api/vendor-levels", vendorLevelRoute);
 app.use("/api/wallet", walletRoute);
+app.use("/api/delivery", deliveryRoutes);
 app.listen(port, () => {
+
   console.log(`Server is running on port: ${port}`);
 });

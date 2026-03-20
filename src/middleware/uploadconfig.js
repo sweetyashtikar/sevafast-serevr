@@ -218,6 +218,28 @@ const uploadProductVideos = multer({
     }
 });
 
+const deliveryConfirmationStorage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: {
+        folder: 'delivery_confirmations',
+        allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+        transformation: [{ width: 1000, height: 1000, crop: 'limit', quality: 'auto' }]
+    }
+});
+
+const uploadDeliveryConfirmation = multer({
+    storage: deliveryConfirmationStorage,
+    fileFilter: (req, file, cb) => {
+        if (!file.mimetype.startsWith('image/')) {
+            return cb(new Error('Only image files are allowed'), false);
+        }
+        cb(null, true);
+    },
+    limits: {
+        fileSize: MAX_FILE_SIZE
+    }
+});
+
 module.exports = {
     uploadSellerDocuments,
     uploadSellerLogo,
@@ -228,5 +250,6 @@ module.exports = {
     uploadBrandImages,
     uploadCategoryImages,
     uploadBannerImages,
-    uploadCouponImages
+    uploadCouponImages,
+    uploadDeliveryConfirmation
 };
