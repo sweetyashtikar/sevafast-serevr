@@ -83,3 +83,5 @@ orderItemSchema.index({ seller_id: 1, status: 1 });
 orderItemSchema.index({ order_id: 1 });
 
 module.exports = mongoose.model("OrderItem", orderItemSchema);
+module.exports.ActiveStatus = ActiveStatus;
+

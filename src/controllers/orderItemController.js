@@ -1,5 +1,7 @@
 const OrderItem = require('../models/orderItem');
+const { ActiveStatus } = require('../models/orderItem');
 const Order = require('../models/orders');
+
 const User = require('../models/User');
 const Product = require('../models/products');
 const mongoose = require('mongoose');
@@ -2853,11 +2855,11 @@ const assignDeliveryBoy = async (req, res) => {
         order.delivery_info.date = new Date(date); // better to store as Date
         order.delivery_info.otp = Math.floor(1000 + Math.random() * 9000);
 
-        order.status = OrderStatus.ASSIGNED;
+        order.status = OrderStatus.SHIPPED;
       const orderItem = await OrderItem.findOne({ order_id: order_id });
-         orderItem.status = ActiveStatus.ASSIGNED
+         orderItem.status = ActiveStatus.SHIPPED
          orderItem.status_history.push({
-            status: ActiveStatus.ASSIGNED,
+            status: ActiveStatus.SHIPPED,
             timestamp: new Date()})
 
         await order.save();
